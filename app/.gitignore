@@ -1,0 +1,81 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# production
+/build
+
+# misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Sensitive configuration files
+config.js
+config.json
+secrets.js
+secrets.json
+
+# API keys and credentials
+**/api-keys.js
+**/credentials.js
+**/auth-config.js
+
+# Email service configuration
+**/email-config.js
+**/emailjs-config.js
+
+# Database configuration
+**/db-config.js
+**/database.js
+
+# Environment files with sensitive data
+.env
+.env.production
+.env.staging
+*.env
+
+# Log files that might contain sensitive data
+*.log
+logs/
+log/
+
+# Backup files
+*.backup
+*.bak
+*.tmp
+
+# CSV files with potentially sensitive data
+/public/*.csv
+/src/data/*.csv
+**/products-data/
+**/scraped-data/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
