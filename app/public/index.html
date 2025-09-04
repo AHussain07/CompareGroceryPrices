@@ -2,16 +2,69 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="Compare Grocery Prices"
-    />
-    <title>Compare Grocery Prices</title>
+    
+    <!-- Primary Meta Tags -->
+    <title>Compare Grocery Prices UK - Find the Cheapest Supermarket for Your Shopping List</title>
+    <meta name="title" content="Compare Grocery Prices UK - Find the Cheapest Supermarket for Your Shopping List">
+    <meta name="description" content="Save up to 40% on groceries! Compare prices across Tesco, ASDA, Sainsbury's, Morrisons & Aldi. Enter your shopping list and find the cheapest supermarket instantly. Free UK price comparison tool.">
+    <meta name="keywords" content="grocery price comparison, UK supermarket prices, cheapest supermarket, Tesco prices, ASDA prices, Sainsbury's prices, Morrisons prices, Aldi prices, shopping list comparison, save money groceries, UK grocery deals">
+    <meta name="author" content="CompareGroceryPrices">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://www.comparegroceryprices.uk">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.comparegroceryprices.uk">
+    <meta property="og:title" content="Compare Grocery Prices UK - Find the Cheapest Supermarket">
+    <meta property="og:description" content="Save up to 40% on groceries! Compare prices across all major UK supermarkets and find the best deals instantly.">
+    <meta property="og:image" content="https://www.comparegroceryprices.uk/og-image.png">
+    <meta property="og:site_name" content="CompareGroceryPrices">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://www.comparegroceryprices.uk">
+    <meta property="twitter:title" content="Compare Grocery Prices UK - Find the Cheapest Supermarket">
+    <meta property="twitter:description" content="Save up to 40% on groceries! Compare prices across all major UK supermarkets and find the best deals instantly.">
+    <meta property="twitter:image" content="https://www.comparegroceryprices.uk/og-image.png">
+
+    <!-- Local Business Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "CompareGroceryPrices",
+      "url": "https://www.comparegroceryprices.uk",
+      "description": "Compare grocery prices across UK supermarkets to find the best deals",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://www.comparegroceryprices.uk/shopping-list?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
+    <script type="text/javascript">
+      // Single Page Apps for GitHub Pages
+      (function(l) {
+        if (l.search[1] === '/' ) {
+          var decoded = sessionStorage.redirect;
+          delete sessionStorage.redirect;
+          if (decoded) {
+            l.replace(l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+              decoded.substr(1));
+            return;
+          }
+        }
+      }(window.location))
+    </script>
   </body>
 </html>
