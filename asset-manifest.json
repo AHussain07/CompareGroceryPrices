@@ -1,13 +1,13 @@
 {
   "files": {
-    "main.css": "/CompareGroceryPrices/static/css/main.3ac53289.css",
-    "main.js": "/CompareGroceryPrices/static/js/main.d9e9676c.js",
-    "index.html": "/CompareGroceryPrices/index.html",
-    "main.3ac53289.css.map": "/CompareGroceryPrices/static/css/main.3ac53289.css.map",
-    "main.d9e9676c.js.map": "/CompareGroceryPrices/static/js/main.d9e9676c.js.map"
+    "main.css": "/static/css/main.3ac53289.css",
+    "main.js": "/static/js/main.f5d61085.js",
+    "index.html": "/index.html",
+    "main.3ac53289.css.map": "/static/css/main.3ac53289.css.map",
+    "main.f5d61085.js.map": "/static/js/main.f5d61085.js.map"
   },
   "entrypoints": [
     "static/css/main.3ac53289.css",
-    "static/js/main.d9e9676c.js"
+    "static/js/main.f5d61085.js"
   ]
 }
