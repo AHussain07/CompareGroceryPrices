@@ -19,6 +19,11 @@ jobs:
       with:
         python-version: '3.11'
     
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget curl unzip xvfb
+    
     - name: Install Chrome
       run: |
         wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
@@ -48,28 +53,79 @@ jobs:
         cd WebScrape
         pip install -r requirements.txt
     
-    - name: Enable headless mode for ALDI scraper
+    - name: Fix ALDI scraper for GitHub Actions
       run: |
         cd WebScrape
-        sed -i 's/# options.add_argument('\''--headless'\'')/options.add_argument('\''--headless'\'')/' aldi.py
-        sed -i '/options.add_argument('\''--headless'\'')/a options.add_argument('\''--no-sandbox'\'')' aldi.py
-        sed -i '/options.add_argument('\''--no-sandbox'\'')/a options.add_argument('\''--disable-dev-shm-usage'\'')' aldi.py
+        cat > fix_aldi.py << 'EOF'
+        import re
+        
+        # Read the current aldi.py file
+        with open('aldi.py', 'r') as f:
+            content = f.read()
+        
+        # Enable headless mode
+        content = re.sub(r'# (options\.add_argument\(\'--headless\'\))', r'\1', content)
+        
+        # Add additional headless options
+        if '--no-sandbox' not in content:
+            content = content.replace(
+                'options.add_argument(\'--headless\')',
+                '''options.add_argument('--headless')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')'''
+            )
+        
+        # Fix any indentation issues
+        lines = content.split('\n')
+        fixed_lines = []
+        for line in lines:
+            # Fix common indentation issues
+            if 'options.add_argument(' in line and not line.strip().startswith('#'):
+                if not line.startswith('    ') and not line.startswith('\t'):
+                    line = '    ' + line.strip()
+            fixed_lines.append(line)
+        
+        content = '\n'.join(fixed_lines)
+        
+        # Write the fixed file
+        with open('aldi.py', 'w') as f:
+            f.write(content)
+        
+        print("ALDI scraper fixed for headless mode")
+        EOF
+        
+        python fix_aldi.py
     
     - name: Create public directory
       run: mkdir -p app/public
     
-    - name: Run ALDI scraper
+    - name: Run ALDI scraper with virtual display
       run: |
         cd WebScrape
-        python aldi.py
+        echo "Starting ALDI scraper..."
+        xvfb-run -a -s "-screen 0 1920x1080x24" python aldi.py
     
-    - name: Check if CSV was created
+    - name: Check results and copy CSV
       run: |
+        echo "Checking for ALDI CSV files..."
+        
+        # Check in WebScrape directory
+        if [ -f "WebScrape/aldi.csv" ]; then
+          echo "Found aldi.csv in WebScrape directory"
+          cp WebScrape/aldi.csv app/public/aldi.csv
+        fi
+        
+        # Check if already in app/public
         if [ -f "app/public/aldi.csv" ]; then
-          echo "✅ ALDI CSV created successfully"
-          echo "Products scraped: $(( $(wc -l < app/public/aldi.csv) - 1 ))"
+          lines=$(wc -l < app/public/aldi.csv)
+          echo "✅ ALDI CSV created successfully with $lines lines"
         else
-          echo "❌ ALDI CSV not found"
+          echo "❌ ALDI CSV not found in either location"
+          echo "Contents of WebScrape directory:"
+          ls -la WebScrape/
+          echo "Contents of app/public directory:"
+          ls -la app/public/
           exit 1
         fi
     
@@ -78,7 +134,8 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         
-        git add app/public/aldi.csv
+        # Force add the CSV file (in case .gitignore blocks it)
+        git add -f app/public/aldi.csv
         
         if ! git diff --staged --quiet; then
           git commit -m "Update ALDI prices - $(date -u '+%Y-%m-%d %H:%M UTC')"
