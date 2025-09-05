@@ -2,11 +2,9 @@ name: Weekly Grocery Price Update
 
 on:
   schedule:
-    # Winter schedule: Monday at 8 AM GMT (UTC+0)
+    # Every Monday at 8 AM UTC (8 AM GMT winter / 9 AM BST summer)
     - cron: '0 8 * * 1'
-    # Summer schedule: Monday at 7 AM UTC (8 AM BST)
-    # You can manually enable/disable based on season
-  workflow_dispatch:
+  workflow_dispatch: # Allow manual triggering
 
 jobs:
   scrape-and-update:
@@ -21,112 +19,187 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: '3.11'
+        cache: 'pip'
+        cache-dependency-path: WebScrape/requirements.txt
     
-    - name: Install Chrome and ChromeDriver
+    - name: Install system dependencies
       run: |
-        # Install Chrome
-        wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-        echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
         sudo apt-get update
-        sudo apt-get install -y google-chrome-stable
+        sudo apt-get install -y wget curl unzip xvfb
+    
+    - name: Setup Chrome and ChromeDriver
+      uses: browser-actions/setup-chrome@v1
+      with:
+        chrome-version: stable
+    
+    - name: Verify Chrome installation
+      run: |
+        google-chrome --version
+        which google-chrome
         
-        # Install ChromeDriver
-        CHROME_VERSION=$(google-chrome --version | cut -d " " -f3 | cut -d "." -f1)
-        CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
-        wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com//${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
-        sudo unzip /tmp/chromedriver.zip chromedriver -d /usr/local/bin/
+        # Download and setup ChromeDriver
+        CHROME_VERSION=$(google-chrome --version | sed 's/Google Chrome //' | cut -d. -f1)
+        echo "Chrome major version: $CHROME_VERSION"
+        
+        # Get compatible ChromeDriver version
+        if [ "$CHROME_VERSION" -ge "115" ]; then
+          # For Chrome 115+, use the new ChromeDriver API
+          CHROMEDRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE")
+          echo "Using ChromeDriver version: $CHROMEDRIVER_VERSION"
+          wget -O /tmp/chromedriver.zip "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROMEDRIVER_VERSION}/linux64/chromedriver-linux64.zip"
+          sudo unzip /tmp/chromedriver.zip -d /tmp/
+          sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/
+        else
+          # For older Chrome versions
+          CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
+          echo "Using ChromeDriver version: $CHROMEDRIVER_VERSION"
+          wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
+          sudo unzip /tmp/chromedriver.zip -d /usr/local/bin/
+        fi
+        
         sudo chmod +x /usr/local/bin/chromedriver
+        chromedriver --version
     
     - name: Install Python dependencies
       run: |
         cd WebScrape
         pip install --upgrade pip
-        pip install selenium beautifulsoup4 pandas undetected-chromedriver lxml html5lib
+        pip install -r requirements.txt
     
-    - name: Configure Chrome for headless mode
+    - name: Update scraper configurations for headless mode
       run: |
-        # Update all Python scripts to run in headless mode
         cd WebScrape
         
-        # Update aldi.py
-        sed -i 's/# options.add_argument('\''--headless'\'')/options.add_argument('\''--headless'\'')/' aldi.py
-        sed -i '/options.add_argument('\''--start-maximized'\'')/a options.add_argument('\''--no-sandbox'\'')' aldi.py
-        sed -i '/options.add_argument('\''--no-sandbox'\'')/a options.add_argument('\''--disable-dev-shm-usage'\'')' aldi.py
+        # Create a patch script to ensure all scrapers run in headless mode
+        cat > patch_scrapers.py << 'EOF'
+        import os
+        import re
+
+        def patch_file(filename):
+            if not os.path.exists(filename):
+                print(f"File {filename} not found, skipping...")
+                return
+                
+            with open(filename, 'r') as f:
+                content = f.read()
+            
+            # Add headless options if not present
+            patterns_to_add = [
+                "options.add_argument('--headless')",
+                "options.add_argument('--no-sandbox')",
+                "options.add_argument('--disable-dev-shm-usage')",
+                "options.add_argument('--disable-gpu')",
+                "options.add_argument('--window-size=1920,1080')",
+                "options.add_argument('--disable-extensions')"
+            ]
+            
+            # Find where options are being set
+            if 'ChromeOptions()' in content or 'webdriver.ChromeOptions()' in content:
+                for pattern in patterns_to_add:
+                    if pattern not in content:
+                        # Add after ChromeOptions() initialization
+                        content = re.sub(
+                            r'(options\s*=\s*.*ChromeOptions\(\))',
+                            r'\1\n    ' + pattern,
+                            content
+                        )
+            
+            with open(filename, 'w') as f:
+                f.write(content)
+            print(f"Patched {filename}")
+
+        # Patch all Python scraper files
+        scrapers = ['aldi.py', 'asda.py', 'tesco.py', 'sainsburys.py', 'morrisons.py']
+        for scraper in scrapers:
+            patch_file(scraper)
+        EOF
         
-        # Update other scripts are already configured for headless in the provided code
+        python patch_scrapers.py
     
     - name: Run ALDI scraper
+      timeout-minutes: 30
       run: |
         cd WebScrape
         echo "🛒 Starting ALDI scraper..."
-        timeout 30m python aldi.py || echo "ALDI scraper completed or timed out"
+        xvfb-run -a python aldi.py 2>&1 | tee aldi.log || echo "ALDI scraper completed with issues"
         
-        # Move CSV to app/public if it exists
         if [ -f "aldi.csv" ]; then
-          mv aldi.csv ../app/public/aldi.csv
-          echo "✅ ALDI CSV updated"
+          cp aldi.csv ../app/public/aldi.csv 2>/dev/null || mkdir -p ../app/public && cp aldi.csv ../app/public/aldi.csv
+          echo "✅ ALDI CSV updated ($(wc -l < aldi.csv) lines)"
         else
           echo "❌ ALDI CSV not generated"
         fi
     
     - name: Run Tesco scraper
+      timeout-minutes: 30
       run: |
         cd WebScrape
         echo "🛒 Starting Tesco scraper..."
-        timeout 30m python tesco.py || echo "Tesco scraper completed or timed out"
+        xvfb-run -a python tesco.py 2>&1 | tee tesco.log || echo "Tesco scraper completed with issues"
         
         if [ -f "tesco.csv" ]; then
-          mv tesco.csv ../app/public/tesco.csv
-          echo "✅ Tesco CSV updated"
+          cp tesco.csv ../app/public/tesco.csv 2>/dev/null || mkdir -p ../app/public && cp tesco.csv ../app/public/tesco.csv
+          echo "✅ Tesco CSV updated ($(wc -l < tesco.csv) lines)"
         else
           echo "❌ Tesco CSV not generated"
         fi
     
     - name: Run Sainsbury's scraper
+      timeout-minutes: 40
       run: |
         cd WebScrape
         echo "🛒 Starting Sainsbury's scraper..."
-        timeout 40m python sainsburys.py || echo "Sainsbury's scraper completed or timed out"
+        xvfb-run -a python sainsburys.py 2>&1 | tee sainsburys.log || echo "Sainsbury's scraper completed with issues"
         
         if [ -f "sainsburys.csv" ]; then
-          mv sainsburys.csv ../app/public/sainsburys.csv
-          echo "✅ Sainsbury's CSV updated"
+          cp sainsburys.csv ../app/public/sainsburys.csv 2>/dev/null || mkdir -p ../app/public && cp sainsburys.csv ../app/public/sainsburys.csv
+          echo "✅ Sainsbury's CSV updated ($(wc -l < sainsburys.csv) lines)"
         else
           echo "❌ Sainsbury's CSV not generated"
         fi
     
     - name: Run Morrisons scraper
+      timeout-minutes: 30
       run: |
         cd WebScrape
         echo "🛒 Starting Morrisons scraper..."
-        timeout 30m python morrisons.py || echo "Morrisons scraper completed or timed out"
+        xvfb-run -a python morrisons.py 2>&1 | tee morrisons.log || echo "Morrisons scraper completed with issues"
         
         if [ -f "morrisons.csv" ]; then
-          mv morrisons.csv ../app/public/morrisons.csv
-          echo "✅ Morrisons CSV updated"
+          cp morrisons.csv ../app/public/morrisons.csv 2>/dev/null || mkdir -p ../app/public && cp morrisons.csv ../app/public/morrisons.csv
+          echo "✅ Morrisons CSV updated ($(wc -l < morrisons.csv) lines)"
         else
           echo "❌ Morrisons CSV not generated"
         fi
     
     - name: Run ASDA scraper
+      timeout-minutes: 45
       run: |
         cd WebScrape
         echo "🛒 Starting ASDA scraper..."
-        timeout 45m python asda.py || echo "ASDA scraper completed or timed out"
+        xvfb-run -a python asda.py 2>&1 | tee asda.log || echo "ASDA scraper completed with issues"
         
         if [ -f "asda.csv" ]; then
-          mv asda.csv ../app/public/asda.csv
-          echo "✅ ASDA CSV updated"
+          cp asda.csv ../app/public/asda.csv 2>/dev/null || mkdir -p ../app/public && cp asda.csv ../app/public/asda.csv
+          echo "✅ ASDA CSV updated ($(wc -l < asda.csv) lines)"
         else
           echo "❌ ASDA CSV not generated"
         fi
     
+    - name: Upload logs on failure
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: scraper-logs
+        path: WebScrape/*.log
+        retention-days: 7
+    
     - name: Check for changes and prepare commit
       id: check_changes
       run: |
-        # Check if any CSV files were updated
-        git add app/public/*.csv
+        mkdir -p app/public
+        git add app/public/*.csv || echo "No CSV files to add"
         
         if git diff --staged --quiet; then
           echo "No changes to commit"
@@ -135,81 +208,58 @@ jobs:
           echo "Changes detected"
           echo "changes=true" >> $GITHUB_OUTPUT
           
-          # Show what changed
           echo "📊 Updated files:"
           git diff --staged --name-only
           
-          # Show file sizes
-          echo "📈 CSV file sizes:"
-          ls -lh app/public/*.csv || echo "Some CSV files missing"
+          echo "📈 CSV file info:"
+          for csv in app/public/*.csv; do
+            if [ -f "$csv" ]; then
+              lines=$(wc -l < "$csv")
+              size=$(ls -lh "$csv" | awk '{print $5}')
+              echo "  $(basename $csv): $lines lines, $size"
+            fi
+          done
         fi
     
     - name: Commit and push changes
       if: steps.check_changes.outputs.changes == 'true'
       run: |
-        # Configure git
         git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+        git config --local user.name "GitHub Action Bot"
         
-        # Create detailed commit message
         TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
-        
-        # Count products in each CSV
         COMMIT_MSG="🤖 Weekly grocery price update - $TIMESTAMP"
-        COMMIT_MSG+="\n\n📊 Updated data:"
         
-        for csv in app/public/*.csv; do
-          if [ -f "$csv" ]; then
-            filename=$(basename "$csv")
-            count=$(tail -n +2 "$csv" 2>/dev/null | wc -l || echo "0")
-            COMMIT_MSG+="\n- $filename: $count products"
-          fi
-        done
-        
-        # Commit and push
         git commit -m "$COMMIT_MSG"
         git push
         
         echo "✅ Changes committed and pushed successfully"
     
-    - name: Create summary
+    - name: Create workflow summary
+      if: always()
       run: |
         echo "## 🛒 Weekly Grocery Price Update Summary" >> $GITHUB_STEP_SUMMARY
         echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 📊 CSV Files Status:" >> $GITHUB_STEP_SUMMARY
+        echo "### 📊 Scraping Results:" >> $GITHUB_STEP_SUMMARY
         
-        for csv in app/public/*.csv; do
-          if [ -f "$csv" ]; then
-            filename=$(basename "$csv")
-            count=$(tail -n +2 "$csv" 2>/dev/null | wc -l || echo "0")
-            size=$(ls -lh "$csv" | awk '{print $5}')
-            echo "- ✅ **$filename**: $count products ($size)" >> $GITHUB_STEP_SUMMARY
+        cd WebScrape
+        for scraper in aldi tesco sainsburys morrisons asda; do
+          if [ -f "${scraper}.csv" ]; then
+            lines=$(wc -l < "${scraper}.csv")
+            echo "- ✅ **${scraper^}**: $lines products scraped" >> $GITHUB_STEP_SUMMARY
+          elif [ -f "../app/public/${scraper}.csv" ]; then
+            lines=$(wc -l < "../app/public/${scraper}.csv")
+            echo "- ✅ **${scraper^}**: $lines products (existing file)" >> $GITHUB_STEP_SUMMARY
           else
-            filename=$(basename "$csv")
-            echo "- ❌ **$filename**: Not generated" >> $GITHUB_STEP_SUMMARY
+            echo "- ❌ **${scraper^}**: Failed to scrape" >> $GITHUB_STEP_SUMMARY
           fi
         done
         
         if [ "${{ steps.check_changes.outputs.changes }}" == "true" ]; then
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "🎉 **Result**: Price data updated successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "🎉 **Result**: Price data updated and committed!" >> $GITHUB_STEP_SUMMARY
         else
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "ℹ️ **Result**: No changes detected." >> $GITHUB_STEP_SUMMARY
+          echo "ℹ️ **Result**: No new data to commit." >> $GITHUB_STEP_SUMMARY
         fi
-    
-    - name: Cleanup
-      if: always()
-      run: |
-        # Clean up any remaining CSV files in WebScrape directory
-        cd WebScrape
-        rm -f *.csv
-        echo "🧹 Cleanup completed"
-
-    # Optional: Deploy updated site to GitHub Pages
-    - name: Trigger GitHub Pages deployment
-      if: steps.check_changes.outputs.changes == 'true'
-      run: |
-        # This will trigger a new GitHub Pages build with updated CSV data
-        echo "📝 CSV files updated, GitHub Pages will rebuild automatically"
