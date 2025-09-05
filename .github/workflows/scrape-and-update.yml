@@ -1,30 +1,23 @@
-name: Weekly Grocery Price Update
+name: ALDI Price Scraper
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: '0 8 * * 1'
-  workflow_dispatch:
 
 jobs:
-  scrape-and-update:
+  scrape-aldi:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 30
     
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-    
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y wget curl unzip xvfb libnss3-dev libxi6 libxrandr2 libasound2-dev libpangocairo-1.0-0 libatk1.0-0 libcairo-gobject2 libgtk-3-0 libgdk-pixbuf2.0-0
     
     - name: Install Chrome
       run: |
@@ -35,118 +28,62 @@ jobs:
     
     - name: Install ChromeDriver
       run: |
-        CHROME_VERSION=$(google-chrome --version | cut -d' ' -f3 | cut -d'.' -f1)
-        DRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
-        wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${DRIVER_VERSION}/chromedriver_linux64.zip"
-        sudo unzip /tmp/chromedriver.zip -d /usr/local/bin/
+        CHROME_VERSION=$(google-chrome --version | sed 's/Google Chrome //' | cut -d'.' -f1)
+        
+        if [ "$CHROME_VERSION" -ge "115" ]; then
+          LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE")
+          wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$LATEST_VERSION/linux64/chromedriver-linux64.zip"
+          sudo unzip /tmp/chromedriver.zip -d /tmp/
+          sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
+        else
+          DRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
+          wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${DRIVER_VERSION}/chromedriver_linux64.zip"
+          sudo unzip /tmp/chromedriver.zip -d /usr/local/bin/
+        fi
+        
         sudo chmod +x /usr/local/bin/chromedriver
     
-    - name: Install Python dependencies
+    - name: Install dependencies
       run: |
         cd WebScrape
-        pip install --upgrade pip
         pip install -r requirements.txt
     
-    - name: Create patch script
+    - name: Enable headless mode for ALDI scraper
       run: |
         cd WebScrape
-        cat > patch.py << 'PATCHEOF'
-        import os
-        import re
-        
-        files = ['aldi.py', 'tesco.py', 'sainsburys.py', 'morrisons.py', 'asda.py']
-        
-        for file in files:
-            if os.path.exists(file):
-                with open(file, 'r') as f:
-                    content = f.read()
-                
-                original = content
-                
-                if 'uc.ChromeOptions()' in content:
-                    if '--headless' not in content:
-                        content = content.replace('uc.ChromeOptions()', 'uc.ChromeOptions()\n    options.add_argument("--headless")\n    options.add_argument("--no-sandbox")\n    options.add_argument("--disable-dev-shm-usage")')
-                
-                if 'max_workers=' in content:
-                    content = re.sub(r'max_workers=\d+', 'max_workers=1', content)
-                
-                if content != original:
-                    with open(file, 'w') as f:
-                        f.write(content)
-                    print(f'Patched {file}')
-        PATCHEOF
-        
-        python patch.py
+        sed -i 's/# options.add_argument('\''--headless'\'')/options.add_argument('\''--headless'\'')/' aldi.py
+        sed -i '/options.add_argument('\''--headless'\'')/a options.add_argument('\''--no-sandbox'\'')' aldi.py
+        sed -i '/options.add_argument('\''--no-sandbox'\'')/a options.add_argument('\''--disable-dev-shm-usage'\'')' aldi.py
     
-    - name: Create directories
+    - name: Create public directory
       run: mkdir -p app/public
     
     - name: Run ALDI scraper
-      timeout-minutes: 25
-      continue-on-error: true
       run: |
         cd WebScrape
-        xvfb-run -a python aldi.py
-        if [ -f "aldi.csv" ]; then
-          cp aldi.csv ../app/public/
+        python aldi.py
+    
+    - name: Check if CSV was created
+      run: |
+        if [ -f "app/public/aldi.csv" ]; then
+          echo "✅ ALDI CSV created successfully"
+          echo "Products scraped: $(( $(wc -l < app/public/aldi.csv) - 1 ))"
+        else
+          echo "❌ ALDI CSV not found"
+          exit 1
         fi
     
-    - name: Run Tesco scraper
-      timeout-minutes: 45
-      continue-on-error: true
-      run: |
-        cd WebScrape
-        xvfb-run -a python tesco.py
-        if [ -f "tesco.csv" ]; then
-          cp tesco.csv ../app/public/
-        fi
-    
-    - name: Run Sainsburys scraper
-      timeout-minutes: 60
-      continue-on-error: true
-      run: |
-        cd WebScrape
-        xvfb-run -a python sainsburys.py
-        if [ -f "sainsburys.csv" ]; then
-          cp sainsburys.csv ../app/public/
-        fi
-    
-    - name: Run Morrisons scraper
-      timeout-minutes: 25
-      continue-on-error: true
-      run: |
-        cd WebScrape
-        xvfb-run -a python morrisons.py
-        if [ -f "morrisons.csv" ]; then
-          cp morrisons.csv ../app/public/
-        fi
-    
-    - name: Run ASDA scraper
-      timeout-minutes: 40
-      continue-on-error: true
-      run: |
-        cd WebScrape
-        xvfb-run -a python asda.py
-        if [ -f "asda.csv" ]; then
-          cp asda.csv ../app/public/
-        fi
-    
-    - name: Count results
-      id: results
-      run: |
-        count=0
-        for store in aldi tesco sainsburys morrisons asda; do
-          if [ -f "app/public/${store}.csv" ]; then
-            count=$((count + 1))
-          fi
-        done
-        echo "count=${count}" >> $GITHUB_OUTPUT
-    
-    - name: Commit changes
-      if: steps.results.outputs.count > '0'
+    - name: Commit and push changes
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add app/public/*.csv
-        git commit -m "Update grocery prices" || exit 0
-        git push
+        
+        git add app/public/aldi.csv
+        
+        if ! git diff --staged --quiet; then
+          git commit -m "Update ALDI prices - $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push
+          echo "✅ Changes committed and pushed"
+        else
+          echo "ℹ️ No changes to commit"
+        fi
