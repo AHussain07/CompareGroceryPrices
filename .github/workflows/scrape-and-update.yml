@@ -1,0 +1,213 @@
+name: Weekly Grocery Price Update
+
+on:
+  schedule:
+    # Run every Sunday at 2 AM UTC (adjust timezone as needed)
+    - cron: '0 2 * * 0'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  scrape-and-update:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install Chrome and ChromeDriver
+      run: |
+        # Install Chrome
+        wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+        echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+        
+        # Install ChromeDriver
+        CHROME_VERSION=$(google-chrome --version | cut -d " " -f3 | cut -d "." -f1)
+        CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
+        wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com//${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
+        sudo unzip /tmp/chromedriver.zip chromedriver -d /usr/local/bin/
+        sudo chmod +x /usr/local/bin/chromedriver
+    
+    - name: Install Python dependencies
+      run: |
+        cd WebScrape
+        pip install --upgrade pip
+        pip install selenium beautifulsoup4 pandas undetected-chromedriver lxml html5lib
+    
+    - name: Configure Chrome for headless mode
+      run: |
+        # Update all Python scripts to run in headless mode
+        cd WebScrape
+        
+        # Update aldi.py
+        sed -i 's/# options.add_argument('\''--headless'\'')/options.add_argument('\''--headless'\'')/' aldi.py
+        sed -i '/options.add_argument('\''--start-maximized'\'')/a options.add_argument('\''--no-sandbox'\'')' aldi.py
+        sed -i '/options.add_argument('\''--no-sandbox'\'')/a options.add_argument('\''--disable-dev-shm-usage'\'')' aldi.py
+        
+        # Update other scripts are already configured for headless in the provided code
+    
+    - name: Run ALDI scraper
+      run: |
+        cd WebScrape
+        echo "🛒 Starting ALDI scraper..."
+        timeout 30m python aldi.py || echo "ALDI scraper completed or timed out"
+        
+        # Move CSV to app/public if it exists
+        if [ -f "aldi.csv" ]; then
+          mv aldi.csv ../app/public/aldi.csv
+          echo "✅ ALDI CSV updated"
+        else
+          echo "❌ ALDI CSV not generated"
+        fi
+    
+    - name: Run Tesco scraper
+      run: |
+        cd WebScrape
+        echo "🛒 Starting Tesco scraper..."
+        timeout 30m python tesco.py || echo "Tesco scraper completed or timed out"
+        
+        if [ -f "tesco.csv" ]; then
+          mv tesco.csv ../app/public/tesco.csv
+          echo "✅ Tesco CSV updated"
+        else
+          echo "❌ Tesco CSV not generated"
+        fi
+    
+    - name: Run Sainsbury's scraper
+      run: |
+        cd WebScrape
+        echo "🛒 Starting Sainsbury's scraper..."
+        timeout 40m python sainsburys.py || echo "Sainsbury's scraper completed or timed out"
+        
+        if [ -f "sainsburys.csv" ]; then
+          mv sainsburys.csv ../app/public/sainsburys.csv
+          echo "✅ Sainsbury's CSV updated"
+        else
+          echo "❌ Sainsbury's CSV not generated"
+        fi
+    
+    - name: Run Morrisons scraper
+      run: |
+        cd WebScrape
+        echo "🛒 Starting Morrisons scraper..."
+        timeout 30m python morrisons.py || echo "Morrisons scraper completed or timed out"
+        
+        if [ -f "morrisons.csv" ]; then
+          mv morrisons.csv ../app/public/morrisons.csv
+          echo "✅ Morrisons CSV updated"
+        else
+          echo "❌ Morrisons CSV not generated"
+        fi
+    
+    - name: Run ASDA scraper
+      run: |
+        cd WebScrape
+        echo "🛒 Starting ASDA scraper..."
+        timeout 45m python asda.py || echo "ASDA scraper completed or timed out"
+        
+        if [ -f "asda.csv" ]; then
+          mv asda.csv ../app/public/asda.csv
+          echo "✅ ASDA CSV updated"
+        else
+          echo "❌ ASDA CSV not generated"
+        fi
+    
+    - name: Check for changes and prepare commit
+      id: check_changes
+      run: |
+        # Check if any CSV files were updated
+        git add app/public/*.csv
+        
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+          echo "changes=false" >> $GITHUB_OUTPUT
+        else
+          echo "Changes detected"
+          echo "changes=true" >> $GITHUB_OUTPUT
+          
+          # Show what changed
+          echo "📊 Updated files:"
+          git diff --staged --name-only
+          
+          # Show file sizes
+          echo "📈 CSV file sizes:"
+          ls -lh app/public/*.csv || echo "Some CSV files missing"
+        fi
+    
+    - name: Commit and push changes
+      if: steps.check_changes.outputs.changes == 'true'
+      run: |
+        # Configure git
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # Create detailed commit message
+        TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+        
+        # Count products in each CSV
+        COMMIT_MSG="🤖 Weekly grocery price update - $TIMESTAMP"
+        COMMIT_MSG+="\n\n📊 Updated data:"
+        
+        for csv in app/public/*.csv; do
+          if [ -f "$csv" ]; then
+            filename=$(basename "$csv")
+            count=$(tail -n +2 "$csv" 2>/dev/null | wc -l || echo "0")
+            COMMIT_MSG+="\n- $filename: $count products"
+          fi
+        done
+        
+        # Commit and push
+        git commit -m "$COMMIT_MSG"
+        git push
+        
+        echo "✅ Changes committed and pushed successfully"
+    
+    - name: Create summary
+      run: |
+        echo "## 🛒 Weekly Grocery Price Update Summary" >> $GITHUB_STEP_SUMMARY
+        echo "**Timestamp:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📊 CSV Files Status:" >> $GITHUB_STEP_SUMMARY
+        
+        for csv in app/public/*.csv; do
+          if [ -f "$csv" ]; then
+            filename=$(basename "$csv")
+            count=$(tail -n +2 "$csv" 2>/dev/null | wc -l || echo "0")
+            size=$(ls -lh "$csv" | awk '{print $5}')
+            echo "- ✅ **$filename**: $count products ($size)" >> $GITHUB_STEP_SUMMARY
+          else
+            filename=$(basename "$csv")
+            echo "- ❌ **$filename**: Not generated" >> $GITHUB_STEP_SUMMARY
+          fi
+        done
+        
+        if [ "${{ steps.check_changes.outputs.changes }}" == "true" ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🎉 **Result**: Price data updated successfully!" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "ℹ️ **Result**: No changes detected." >> $GITHUB_STEP_SUMMARY
+        fi
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        # Clean up any remaining CSV files in WebScrape directory
+        cd WebScrape
+        rm -f *.csv
+        echo "🧹 Cleanup completed"
+
+    # Optional: Deploy updated site to GitHub Pages
+    - name: Trigger GitHub Pages deployment
+      if: steps.check_changes.outputs.changes == 'true'
+      run: |
+        # This will trigger a new GitHub Pages build with updated CSV data
+        echo "📝 CSV files updated, GitHub Pages will rebuild automatically"
