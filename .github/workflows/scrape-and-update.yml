@@ -8,14 +8,13 @@ on:
 jobs:
   scrape-and-update:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 240
     
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-        fetch-depth: 1
     
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -33,32 +32,14 @@ jobs:
         echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
         sudo apt-get update
         sudo apt-get install -y google-chrome-stable
-        
-        CHROME_VERSION=$(google-chrome --version)
-        echo "Installed Chrome: $CHROME_VERSION"
     
     - name: Install ChromeDriver
       run: |
-        CHROME_MAJOR_VERSION=$(google-chrome --version | sed 's/Google Chrome //' | cut -d. -f1)
-        echo "Chrome major version: $CHROME_MAJOR_VERSION"
-        
-        if [ "$CHROME_MAJOR_VERSION" -ge "115" ]; then
-          LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE")
-          echo "Using ChromeDriver version: $LATEST_VERSION"
-          
-          wget -O /tmp/chromedriver.zip "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$LATEST_VERSION/linux64/chromedriver-linux64.zip"
-          sudo unzip /tmp/chromedriver.zip -d /tmp/
-          sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
-        else
-          CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_MAJOR_VERSION")
-          echo "Using ChromeDriver version: $CHROMEDRIVER_VERSION"
-          
-          wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip"
-          sudo unzip /tmp/chromedriver.zip -d /usr/local/bin/
-        fi
-        
+        CHROME_VERSION=$(google-chrome --version | cut -d' ' -f3 | cut -d'.' -f1)
+        DRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
+        wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${DRIVER_VERSION}/chromedriver_linux64.zip"
+        sudo unzip /tmp/chromedriver.zip -d /usr/local/bin/
         sudo chmod +x /usr/local/bin/chromedriver
-        chromedriver --version
     
     - name: Install Python dependencies
       run: |
@@ -66,119 +47,68 @@ jobs:
         pip install --upgrade pip
         pip install -r requirements.txt
     
-    - name: Enhanced scraper patching
+    - name: Create patch script
       run: |
         cd WebScrape
-        
-        cat > enhanced_patch.py << 'EOF'
+        cat > patch.py << 'PATCHEOF'
         import os
         import re
-
-        def patch_scraper_enhanced(filename):
-            if not os.path.exists(filename):
-                print(f"File {filename} not found, skipping...")
-                return False
-            
-            print(f"Enhanced patching {filename}...")
-            
-            with open(filename, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            original_content = content
-            
-            # Add headless options
-            if any(x in content for x in ['ChromeOptions()', 'webdriver.ChromeOptions()', 'uc.ChromeOptions()']):
-                headless_options = [
-                    "options.add_argument('--headless')",
-                    "options.add_argument('--no-sandbox')",
-                    "options.add_argument('--disable-dev-shm-usage')",
-                    "options.add_argument('--disable-gpu')",
-                    "options.add_argument('--disable-extensions')",
-                    "options.add_argument('--window-size=1920,1080')"
-                ]
+        
+        files = ['aldi.py', 'tesco.py', 'sainsburys.py', 'morrisons.py', 'asda.py']
+        
+        for file in files:
+            if os.path.exists(file):
+                with open(file, 'r') as f:
+                    content = f.read()
                 
-                for option in headless_options:
-                    if option not in content:
-                        patterns = [
-                            r'(options\s*=\s*.*ChromeOptions\(\))',
-                            r'(options\s*=\s*uc\.ChromeOptions\(\))',
-                            r'(options\s*=\s*webdriver\.ChromeOptions\(\))'
-                        ]
-                        
-                        for pattern in patterns:
-                            if re.search(pattern, content):
-                                content = re.sub(pattern, r'\1\n    ' + option, content)
-                                break
-            
-            if content != original_content:
-                with open(filename, 'w', encoding='utf-8') as f:
-                    f.write(content)
-                print(f"✅ Enhanced patch applied to {filename}")
-                return True
-            else:
-                print(f"ℹ️  No changes needed for {filename}")
-                return False
-
-        scrapers = ['aldi.py', 'tesco.py', 'sainsburys.py', 'morrisons.py', 'asda.py']
-        for scraper in scrapers:
-            patch_scraper_enhanced(scraper)
+                original = content
+                
+                if 'uc.ChromeOptions()' in content:
+                    if '--headless' not in content:
+                        content = content.replace('uc.ChromeOptions()', 'uc.ChromeOptions()\n    options.add_argument("--headless")\n    options.add_argument("--no-sandbox")\n    options.add_argument("--disable-dev-shm-usage")')
+                
+                if 'max_workers=' in content:
+                    content = re.sub(r'max_workers=\d+', 'max_workers=1', content)
+                
+                if content != original:
+                    with open(file, 'w') as f:
+                        f.write(content)
+                    print(f'Patched {file}')
+        PATCHEOF
         
-        print("Enhanced patching complete!")
-        EOF
-        
-        python enhanced_patch.py
+        python patch.py
     
     - name: Create directories
-      run: |
-        mkdir -p app/public
-        echo "Created app/public directory"
+      run: mkdir -p app/public
     
     - name: Run ALDI scraper
       timeout-minutes: 25
       continue-on-error: true
       run: |
         cd WebScrape
-        echo "Starting ALDI scraper..."
-        xvfb-run -a -s "-screen 0 1920x1080x24" python aldi.py > aldi.log 2>&1
-        
+        xvfb-run -a python aldi.py
         if [ -f "aldi.csv" ]; then
-          cp aldi.csv ../app/public/aldi.csv
-          lines=$(wc -l < aldi.csv)
-          echo "ALDI: $lines products scraped"
-        else
-          echo "ALDI: No CSV generated"
+          cp aldi.csv ../app/public/
         fi
     
     - name: Run Tesco scraper
-      timeout-minutes: 30
+      timeout-minutes: 45
       continue-on-error: true
       run: |
         cd WebScrape
-        echo "Starting Tesco scraper..."
-        xvfb-run -a -s "-screen 0 1920x1080x24" python tesco.py > tesco.log 2>&1
-        
+        xvfb-run -a python tesco.py
         if [ -f "tesco.csv" ]; then
-          cp tesco.csv ../app/public/tesco.csv
-          lines=$(wc -l < tesco.csv)
-          echo "Tesco: $lines products scraped"
-        else
-          echo "Tesco: No CSV generated"
+          cp tesco.csv ../app/public/
         fi
     
     - name: Run Sainsburys scraper
-      timeout-minutes: 40
+      timeout-minutes: 60
       continue-on-error: true
       run: |
         cd WebScrape
-        echo "Starting Sainsburys scraper..."
-        xvfb-run -a -s "-screen 0 1920x1080x24" python sainsburys.py > sainsburys.log 2>&1
-        
+        xvfb-run -a python sainsburys.py
         if [ -f "sainsburys.csv" ]; then
-          cp sainsburys.csv ../app/public/sainsburys.csv
-          lines=$(wc -l < sainsburys.csv)
-          echo "Sainsburys: $lines products scraped"
-        else
-          echo "Sainsburys: No CSV generated"
+          cp sainsburys.csv ../app/public/
         fi
     
     - name: Run Morrisons scraper
@@ -186,15 +116,9 @@ jobs:
       continue-on-error: true
       run: |
         cd WebScrape
-        echo "Starting Morrisons scraper..."
-        xvfb-run -a -s "-screen 0 1920x1080x24" python morrisons.py > morrisons.log 2>&1
-        
+        xvfb-run -a python morrisons.py
         if [ -f "morrisons.csv" ]; then
-          cp morrisons.csv ../app/public/morrisons.csv
-          lines=$(wc -l < morrisons.csv)
-          echo "Morrisons: $lines products scraped"
-        else
-          echo "Morrisons: No CSV generated"
+          cp morrisons.csv ../app/public/
         fi
     
     - name: Run ASDA scraper
@@ -202,124 +126,27 @@ jobs:
       continue-on-error: true
       run: |
         cd WebScrape
-        echo "Starting ASDA scraper..."
-        xvfb-run -a -s "-screen 0 1920x1080x24" python asda.py > asda.log 2>&1
-        
+        xvfb-run -a python asda.py
         if [ -f "asda.csv" ]; then
-          cp asda.csv ../app/public/asda.csv
-          lines=$(wc -l < asda.csv)
-          echo "ASDA: $lines products scraped"
-        else
-          echo "ASDA: No CSV generated"
+          cp asda.csv ../app/public/
         fi
     
-    - name: Upload logs
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: scraper-logs
-        path: WebScrape/*.log
-        retention-days: 7
-        if-no-files-found: ignore
-    
-    - name: Check results
-      id: check_results
+    - name: Count results
+      id: results
       run: |
-        echo "Checking scraping results..."
-        
-        success_count=0
-        total_products=0
-        
+        count=0
         for store in aldi tesco sainsburys morrisons asda; do
           if [ -f "app/public/${store}.csv" ]; then
-            lines=$(( $(wc -l < "app/public/${store}.csv") - 1 ))
-            total_products=$(( total_products + lines ))
-            success_count=$(( success_count + 1 ))
-            echo "${store}: $lines products"
-          else
-            echo "${store}: Failed"
+            count=$((count + 1))
           fi
         done
-        
-        echo "success_count=$success_count" >> $GITHUB_OUTPUT
-        echo "total_products=$total_products" >> $GITHUB_OUTPUT
-        
-        if [ $success_count -gt 0 ]; then
-          echo "has_data=true" >> $GITHUB_OUTPUT
-        else
-          echo "has_data=false" >> $GITHUB_OUTPUT
-        fi
+        echo "count=${count}" >> $GITHUB_OUTPUT
     
-    - name: Force add CSV files and check for changes
-      if: steps.check_results.outputs.has_data == 'true'
-      id: check_changes
-      run: |
-        # Force add CSV files (override gitignore)
-        git add -f app/public/*.csv || echo "No CSV files to force add"
-        
-        if git diff --staged --quiet; then
-          echo "changes=false" >> $GITHUB_OUTPUT
-          echo "No changes to commit"
-        else
-          echo "changes=true" >> $GITHUB_OUTPUT
-          echo "CSV files ready to commit:"
-          git diff --staged --name-only
-        fi
-    
-    - name: Commit and push
-      if: steps.check_changes.outputs.changes == 'true'
+    - name: Commit changes
+      if: steps.results.outputs.count > '0'
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        
-        timestamp=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
-        
-        git commit -m "🛒 Weekly grocery price update - $timestamp
-
-        Successfully scraped ${{ steps.check_results.outputs.success_count }}/5 stores
-        Total products: ${{ steps.check_results.outputs.total_products }}
-        
-        📊 Results:
-        $(for store in aldi tesco sainsburys morrisons asda; do
-          if [ -f "app/public/${store}.csv" ]; then
-            lines=$(( $(wc -l < "app/public/${store}.csv") - 1 ))
-            echo "- ${store^}: $lines products"
-          else
-            echo "- ${store^}: Failed"
-          fi
-        done)
-        
-        🤖 Automated scraping via GitHub Actions"
-        
+        git add app/public/*.csv
+        git commit -m "Update grocery prices" || exit 0
         git push
-        
-        echo "✅ Changes committed and pushed!"
-    
-    - name: Create summary
-      if: always()
-      run: |
-        echo "## 🛒 Weekly Grocery Price Scraping Results" >> $GITHUB_STEP_SUMMARY
-        echo "**Completed:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        
-        echo "### 📊 Results:" >> $GITHUB_STEP_SUMMARY
-        
-        for store in aldi tesco sainsburys morrisons asda; do
-          if [ -f "app/public/${store}.csv" ]; then
-            lines=$(( $(wc -l < "app/public/${store}.csv") - 1 ))
-            echo "- ✅ **${store^}**: $lines products" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- ❌ **${store^}**: Failed" >> $GITHUB_STEP_SUMMARY
-          fi
-        done
-        
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 📈 Summary:" >> $GITHUB_STEP_SUMMARY
-        echo "- **Success Rate**: ${{ steps.check_results.outputs.success_count }}/5 stores" >> $GITHUB_STEP_SUMMARY
-        echo "- **Total Products**: ${{ steps.check_results.outputs.total_products }}" >> $GITHUB_STEP_SUMMARY
-        
-        if [ "${{ steps.check_changes.outputs.changes }}" == "true" ]; then
-          echo "- **Status**: ✅ New data committed" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "- **Status**: ℹ️ No changes detected" >> $GITHUB_STEP_SUMMARY
-        fi
