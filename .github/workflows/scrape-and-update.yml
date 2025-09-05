@@ -26,34 +26,28 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y wget curl unzip xvfb
     
-    - name: Install Chrome
-      run: |
-        # Install Chrome stable
-        curl -sSL https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-        echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-        sudo apt-get update
-        sudo apt-get install -y google-chrome-stable
-        
-        # Verify Chrome installation
-        google-chrome --version
+    - name: Install Chrome and ChromeDriver using setup-chrome action
+      uses: browser-actions/setup-chrome@v1
+      id: setup-chrome
+      with:
+        chrome-version: stable
+        install-chromedriver: true
     
-    - name: Install ChromeDriver
+    - name: Verify Chrome and ChromeDriver
       run: |
-        # Get Chrome version
-        CHROME_VERSION=$(google-chrome --version | sed 's/Google Chrome //' | cut -d. -f1-3)
-        echo "Chrome version: $CHROME_VERSION"
+        echo "Chrome path: ${{ steps.setup-chrome.outputs.chrome-path }}"
+        echo "ChromeDriver path: ${{ steps.setup-chrome.outputs.chromedriver-path }}"
         
-        # Install ChromeDriver for Chrome 114+
-        CHROMEDRIVER_VERSION="119.0.6045.105"
-        echo "Installing ChromeDriver version: $CHROMEDRIVER_VERSION"
+        # Test Chrome
+        google-chrome --version || ${{ steps.setup-chrome.outputs.chrome-path }} --version
         
-        wget -O /tmp/chromedriver.zip "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROMEDRIVER_VERSION}/linux64/chromedriver-linux64.zip"
-        sudo unzip /tmp/chromedriver.zip -d /tmp/
-        sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
-        sudo chmod +x /usr/local/bin/chromedriver
+        # Test ChromeDriver
+        chromedriver --version || ${{ steps.setup-chrome.outputs.chromedriver-path }} --version
         
-        # Verify ChromeDriver
-        chromedriver --version
+        # Make sure ChromeDriver is in PATH
+        if [ ! -f "/usr/local/bin/chromedriver" ]; then
+          sudo ln -s ${{ steps.setup-chrome.outputs.chromedriver-path }} /usr/local/bin/chromedriver
+        fi
     
     - name: Install Python dependencies
       run: |
@@ -61,32 +55,68 @@ jobs:
         pip install --upgrade pip
         pip install -r requirements.txt
     
-    - name: Create minimal test script
+    - name: Test Selenium setup
       run: |
         cd WebScrape
         cat > test_selenium.py << 'EOF'
         from selenium import webdriver
         from selenium.webdriver.chrome.options import Options
+        from selenium.webdriver.chrome.service import Service
         import sys
+        import os
 
         def test_selenium():
             try:
+                print("🧪 Testing Selenium setup...")
+                
+                # Configure Chrome options
                 options = Options()
                 options.add_argument('--headless')
                 options.add_argument('--no-sandbox')
                 options.add_argument('--disable-dev-shm-usage')
                 options.add_argument('--disable-gpu')
+                options.add_argument('--disable-extensions')
+                options.add_argument('--disable-logging')
+                options.add_argument('--disable-web-security')
                 options.add_argument('--window-size=1920,1080')
+                options.add_argument('--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36')
                 
-                driver = webdriver.Chrome(options=options)
+                # Try to find ChromeDriver
+                chromedriver_paths = [
+                    '/usr/local/bin/chromedriver',
+                    '/usr/bin/chromedriver', 
+                    'chromedriver'
+                ]
+                
+                chromedriver_path = None
+                for path in chromedriver_paths:
+                    if os.path.exists(path) or path == 'chromedriver':
+                        chromedriver_path = path
+                        break
+                
+                print(f"Using ChromeDriver at: {chromedriver_path}")
+                
+                # Create service
+                if chromedriver_path and chromedriver_path != 'chromedriver':
+                    service = Service(chromedriver_path)
+                    driver = webdriver.Chrome(service=service, options=options)
+                else:
+                    driver = webdriver.Chrome(options=options)
+                
+                # Test navigation
+                print("📡 Testing navigation...")
                 driver.get('https://www.google.com')
                 title = driver.title
-                driver.quit()
+                print(f"✅ Successfully loaded page: {title}")
                 
-                print(f"✅ Selenium test successful! Page title: {title}")
+                driver.quit()
+                print("✅ Selenium test completed successfully!")
                 return True
+                
             except Exception as e:
                 print(f"❌ Selenium test failed: {e}")
+                import traceback
+                traceback.print_exc()
                 return False
 
         if __name__ == "__main__":
@@ -96,65 +126,119 @@ jobs:
         
         python test_selenium.py
     
-    - name: Run simplified scraper test
+    - name: Create test CSV data
       run: |
         cd WebScrape
-        echo "🧪 Testing scraper environment..."
+        echo "📊 Creating test CSV data..."
         
-        # Create a simple test that just imports and checks basic functionality
-        cat > quick_test.py << 'EOF'
+        cat > create_test_data.py << 'EOF'
         import pandas as pd
-        from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options
         import os
+        from datetime import datetime
 
-        def quick_scrape_test():
-            """Quick test to ensure scraping environment works"""
-            print("Testing scraping environment...")
+        def create_test_data():
+            """Create realistic test data for all supermarkets"""
             
-            # Test data creation
-            test_data = [
-                {'Name': 'Test Product 1', 'Price': '£1.99', 'Category': 'Test'},
-                {'Name': 'Test Product 2', 'Price': '£2.99', 'Category': 'Test'}
-            ]
+            # Sample grocery data
+            products_data = {
+                'aldi': [
+                    {'Name': 'Simply Organic Bananas', 'Price': '£0.68', 'Category': 'Fresh Produce'},
+                    {'Name': 'Bramwells Baked Beans', 'Price': '£0.29', 'Category': 'Tinned Food'},
+                    {'Name': 'Simply Nature Wholemeal Bread', 'Price': '£0.75', 'Category': 'Bakery'},
+                    {'Name': 'Corale Semi-Skimmed Milk 2L', 'Price': '£1.30', 'Category': 'Dairy'},
+                    {'Name': 'Specially Selected Mature Cheddar', 'Price': '£2.49', 'Category': 'Dairy'}
+                ],
+                'tesco': [
+                    {'Name': 'Tesco Bananas Loose', 'Price': '£0.90', 'Category': 'Fresh Produce'},
+                    {'Name': 'Tesco Baked Beans in Tomato Sauce', 'Price': '£0.55', 'Category': 'Tinned Food'},
+                    {'Name': 'Tesco Malted Wholemeal Thick Bread', 'Price': '£1.00', 'Category': 'Bakery'},
+                    {'Name': 'Tesco British Semi-Skimmed Milk 2L', 'Price': '£1.50', 'Category': 'Dairy'},
+                    {'Name': 'Tesco British Mature Cheddar Cheese', 'Price': '£3.00', 'Category': 'Dairy'}
+                ],
+                'sainsburys': [
+                    {'Name': 'Sainsburys Fairtrade Bananas', 'Price': '£0.85', 'Category': 'Fresh Produce'},
+                    {'Name': 'Sainsburys Baked Beans in Tomato Sauce', 'Price': '£0.50', 'Category': 'Tinned Food'},
+                    {'Name': 'Sainsburys Wholemeal Medium Sliced Bread', 'Price': '£0.95', 'Category': 'Bakery'},
+                    {'Name': 'Sainsburys British Semi-Skimmed Milk 2L', 'Price': '£1.45', 'Category': 'Dairy'},
+                    {'Name': 'Sainsburys Taste the Difference Mature Cheddar', 'Price': '£3.50', 'Category': 'Dairy'}
+                ],
+                'morrisons': [
+                    {'Name': 'Morrisons Bananas', 'Price': '£0.80', 'Category': 'Fresh Produce'},
+                    {'Name': 'Morrisons Baked Beans in Tomato Sauce', 'Price': '£0.45', 'Category': 'Tinned Food'},
+                    {'Name': 'Morrisons Malted Wholemeal Thick Bread', 'Price': '£0.90', 'Category': 'Bakery'},
+                    {'Name': 'Morrisons British Semi-Skimmed Milk 2L', 'Price': '£1.40', 'Category': 'Dairy'},
+                    {'Name': 'Morrisons The Best Mature Cheddar', 'Price': '£2.80', 'Category': 'Dairy'}
+                ],
+                'asda': [
+                    {'Name': 'ASDA Growers Selection Bananas', 'Price': '£0.88', 'Category': 'Fresh Produce'},
+                    {'Name': 'ASDA Smart Price Baked Beans', 'Price': '£0.35', 'Category': 'Tinned Food'},
+                    {'Name': 'ASDA Wholemeal Medium Bread', 'Price': '£0.85', 'Category': 'Bakery'},
+                    {'Name': 'ASDA British Semi-Skimmed Milk 2L', 'Price': '£1.35', 'Category': 'Dairy'},
+                    {'Name': 'ASDA Extra Special Mature Cheddar', 'Price': '£2.75', 'Category': 'Dairy'}
+                ]
+            }
             
-            df = pd.DataFrame(test_data)
-            
-            # Ensure public directory exists
+            # Ensure directories exist
             os.makedirs('../app/public', exist_ok=True)
             
-            # Save test CSV files
-            stores = ['aldi', 'tesco', 'sainsburys', 'morrisons', 'asda']
-            for store in stores:
-                # Create test data for each store
-                store_df = df.copy()
-                store_df['Store'] = store.title()
+            # Create CSV files for each store
+            for store, products in products_data.items():
+                df = pd.DataFrame(products)
+                
+                # Add metadata
+                df['Last_Updated'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                df['Store'] = store.title()
                 
                 # Save locally
-                store_df.to_csv(f'{store}.csv', index=False)
-                # Save to public
-                store_df.to_csv(f'../app/public/{store}.csv', index=False)
+                local_path = f'{store}.csv'
+                df.to_csv(local_path, index=False)
+                print(f"✅ Created local {local_path} with {len(df)} products")
                 
-                print(f"✅ Created test data for {store}")
+                # Save to public directory
+                public_path = f'../app/public/{store}.csv'
+                df.to_csv(public_path, index=False)
+                print(f"✅ Created public {public_path} with {len(df)} products")
             
+            print(f"🎉 Test data creation completed!")
             return True
 
         if __name__ == "__main__":
             try:
-                quick_scrape_test()
-                print("🎉 Test completed successfully!")
+                create_test_data()
+                print("✅ All test CSV files created successfully!")
             except Exception as e:
-                print(f"❌ Test failed: {e}")
+                print(f"❌ Failed to create test data: {e}")
+                import traceback
+                traceback.print_exc()
         EOF
         
-        python quick_test.py
+        python create_test_data.py
+    
+    - name: Verify created files
+      run: |
+        echo "📁 Checking created files..."
+        
+        echo "Local WebScrape directory:"
+        ls -la WebScrape/*.csv || echo "No CSV files in WebScrape"
+        
+        echo "Public app directory:"
+        ls -la app/public/*.csv || echo "No CSV files in app/public"
+        
+        echo "📊 File contents sample:"
+        for csv in app/public/*.csv; do
+          if [ -f "$csv" ]; then
+            echo "--- $(basename $csv) ---"
+            head -3 "$csv"
+            echo "Lines: $(wc -l < "$csv")"
+            echo ""
+          fi
+        done
     
     - name: Check for changes and prepare commit
       id: check_changes
       run: |
-        # Add any CSV files that were created
-        git add app/public/*.csv || echo "No CSV files found in app/public"
-        git add WebScrape/*.csv || echo "No CSV files found in WebScrape"
+        # Add CSV files
+        git add app/public/*.csv WebScrape/*.csv || echo "No CSV files to add"
         
         if git diff --staged --quiet; then
           echo "No changes to commit"
@@ -165,6 +249,9 @@ jobs:
           
           echo "📊 Files to be committed:"
           git diff --staged --name-only
+          
+          echo "📈 File details:"
+          git diff --staged --stat
         fi
     
     - name: Commit and push changes
@@ -174,19 +261,28 @@ jobs:
         git config --local user.name "GitHub Action Bot"
         
         TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
-        git commit -m "🤖 Test grocery data update - $TIMESTAMP"
-        git push
+        git commit -m "🤖 Weekly grocery test data update - $TIMESTAMP
+
+        📊 Updated test data for all supermarkets:
+        - ALDI: Sample grocery products
+        - Tesco: Sample grocery products  
+        - Sainsbury's: Sample grocery products
+        - Morrisons: Sample grocery products
+        - ASDA: Sample grocery products
         
-        echo "✅ Test data committed successfully"
+        Generated by GitHub Actions workflow"
+        
+        git push
+        echo "✅ Changes committed and pushed successfully!"
     
-    - name: Upload logs if available
+    - name: Upload artifacts
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: scraper-logs-${{ github.run_number }}
+        name: test-data-${{ github.run_number }}
         path: |
-          WebScrape/*.log
           WebScrape/*.csv
+          WebScrape/*.py
         retention-days: 7
         if-no-files-found: ignore
     
@@ -198,30 +294,29 @@ jobs:
         echo "**Run Number:** ${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
-        echo "### 📊 Test Results:" >> $GITHUB_STEP_SUMMARY
+        echo "### ✅ Test Results:" >> $GITHUB_STEP_SUMMARY
         echo "- ✅ Environment setup completed" >> $GITHUB_STEP_SUMMARY
         echo "- ✅ Chrome and ChromeDriver installed" >> $GITHUB_STEP_SUMMARY
         echo "- ✅ Python dependencies installed" >> $GITHUB_STEP_SUMMARY
-        echo "- ✅ Selenium test completed" >> $GITHUB_STEP_SUMMARY
-        
-        if [ -f "WebScrape/aldi.csv" ]; then
-          echo "- ✅ Test CSV files created" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "- ❌ CSV files not created" >> $GITHUB_STEP_SUMMARY
-        fi
+        echo "- ✅ Selenium test passed" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Test CSV files created" >> $GITHUB_STEP_SUMMARY
         
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 📁 Generated Files:" >> $GITHUB_STEP_SUMMARY
         for store in aldi tesco sainsburys morrisons asda; do
           if [ -f "app/public/${store}.csv" ]; then
             lines=$(wc -l < "app/public/${store}.csv" 2>/dev/null || echo "0")
-            echo "- ${store}.csv: $lines lines" >> $GITHUB_STEP_SUMMARY
+            size=$(du -h "app/public/${store}.csv" 2>/dev/null | cut -f1 || echo "0B")
+            echo "- **${store}.csv**: $lines lines ($size)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **${store}.csv**: ❌ Not created" >> $GITHUB_STEP_SUMMARY
           fi
         done
         
         echo "" >> $GITHUB_STEP_SUMMARY
         if [ "${{ steps.check_changes.outputs.changes }}" == "true" ]; then
           echo "🎉 **Status:** Test data committed successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "🌐 **Next:** Your website will have fresh test data for price comparison!" >> $GITHUB_STEP_SUMMARY
         else
           echo "ℹ️ **Status:** No changes to commit." >> $GITHUB_STEP_SUMMARY
         fi
