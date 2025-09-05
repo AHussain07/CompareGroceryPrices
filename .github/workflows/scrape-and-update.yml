@@ -2,14 +2,13 @@ name: Weekly Grocery Price Update
 
 on:
   schedule:
-    # Every Monday at 8 AM UTC (8 AM GMT winter / 9 AM BST summer)
     - cron: '0 8 * * 1'
-  workflow_dispatch: # Allow manual triggering
+  workflow_dispatch:
 
 jobs:
   scrape-and-update:
     runs-on: ubuntu-latest
-    timeout-minutes: 180 # 3 hours max
+    timeout-minutes: 180
     
     steps:
     - name: Checkout repository
@@ -67,28 +66,28 @@ jobs:
         pip install --upgrade pip
         pip install -r requirements.txt
     
-    - name: Patch scrapers for GitHub Actions
+    - name: Enhanced scraper patching
       run: |
         cd WebScrape
         
-        cat > patch_scrapers.py << 'EOF'
+        cat > enhanced_patch.py << 'EOF'
         import os
         import re
 
-        def patch_scraper(filename):
+        def patch_scraper_enhanced(filename):
             if not os.path.exists(filename):
                 print(f"File {filename} not found, skipping...")
                 return False
             
-            print(f"Patching {filename}...")
+            print(f"Enhanced patching {filename}...")
             
             with open(filename, 'r', encoding='utf-8') as f:
                 content = f.read()
             
             original_content = content
             
-            # Add headless options if ChromeOptions is used
-            if 'ChromeOptions()' in content or 'webdriver.ChromeOptions()' in content:
+            # Add headless options
+            if any(x in content for x in ['ChromeOptions()', 'webdriver.ChromeOptions()', 'uc.ChromeOptions()']):
                 headless_options = [
                     "options.add_argument('--headless')",
                     "options.add_argument('--no-sandbox')",
@@ -100,30 +99,34 @@ jobs:
                 
                 for option in headless_options:
                     if option not in content:
-                        content = re.sub(
+                        patterns = [
                             r'(options\s*=\s*.*ChromeOptions\(\))',
-                            r'\1\n    ' + option,
-                            content
-                        )
+                            r'(options\s*=\s*uc\.ChromeOptions\(\))',
+                            r'(options\s*=\s*webdriver\.ChromeOptions\(\))'
+                        ]
+                        
+                        for pattern in patterns:
+                            if re.search(pattern, content):
+                                content = re.sub(pattern, r'\1\n    ' + option, content)
+                                break
             
-            # Save if changed
             if content != original_content:
                 with open(filename, 'w', encoding='utf-8') as f:
                     f.write(content)
-                print(f"Successfully patched {filename}")
+                print(f"✅ Enhanced patch applied to {filename}")
                 return True
             else:
-                print(f"No changes needed for {filename}")
+                print(f"ℹ️  No changes needed for {filename}")
                 return False
 
         scrapers = ['aldi.py', 'tesco.py', 'sainsburys.py', 'morrisons.py', 'asda.py']
         for scraper in scrapers:
-            patch_scraper(scraper)
+            patch_scraper_enhanced(scraper)
         
-        print("Patching complete!")
+        print("Enhanced patching complete!")
         EOF
         
-        python patch_scrapers.py
+        python enhanced_patch.py
     
     - name: Create directories
       run: |
@@ -136,7 +139,6 @@ jobs:
       run: |
         cd WebScrape
         echo "Starting ALDI scraper..."
-        
         xvfb-run -a -s "-screen 0 1920x1080x24" python aldi.py > aldi.log 2>&1
         
         if [ -f "aldi.csv" ]; then
@@ -148,12 +150,11 @@ jobs:
         fi
     
     - name: Run Tesco scraper
-      timeout-minutes: 25
+      timeout-minutes: 30
       continue-on-error: true
       run: |
         cd WebScrape
         echo "Starting Tesco scraper..."
-        
         xvfb-run -a -s "-screen 0 1920x1080x24" python tesco.py > tesco.log 2>&1
         
         if [ -f "tesco.csv" ]; then
@@ -165,12 +166,11 @@ jobs:
         fi
     
     - name: Run Sainsburys scraper
-      timeout-minutes: 35
+      timeout-minutes: 40
       continue-on-error: true
       run: |
         cd WebScrape
         echo "Starting Sainsburys scraper..."
-        
         xvfb-run -a -s "-screen 0 1920x1080x24" python sainsburys.py > sainsburys.log 2>&1
         
         if [ -f "sainsburys.csv" ]; then
@@ -187,7 +187,6 @@ jobs:
       run: |
         cd WebScrape
         echo "Starting Morrisons scraper..."
-        
         xvfb-run -a -s "-screen 0 1920x1080x24" python morrisons.py > morrisons.log 2>&1
         
         if [ -f "morrisons.csv" ]; then
@@ -204,7 +203,6 @@ jobs:
       run: |
         cd WebScrape
         echo "Starting ASDA scraper..."
-        
         xvfb-run -a -s "-screen 0 1920x1080x24" python asda.py > asda.log 2>&1
         
         if [ -f "asda.csv" ]; then
@@ -252,16 +250,20 @@ jobs:
           echo "has_data=false" >> $GITHUB_OUTPUT
         fi
     
-    - name: Check for changes
+    - name: Force add CSV files and check for changes
       if: steps.check_results.outputs.has_data == 'true'
       id: check_changes
       run: |
-        git add app/public/*.csv
+        # Force add CSV files (override gitignore)
+        git add -f app/public/*.csv || echo "No CSV files to force add"
         
         if git diff --staged --quiet; then
           echo "changes=false" >> $GITHUB_OUTPUT
+          echo "No changes to commit"
         else
           echo "changes=true" >> $GITHUB_OUTPUT
+          echo "CSV files ready to commit:"
+          git diff --staged --name-only
         fi
     
     - name: Commit and push
@@ -272,42 +274,52 @@ jobs:
         
         timestamp=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
         
-        git commit -m "Weekly grocery price update - $timestamp
+        git commit -m "🛒 Weekly grocery price update - $timestamp
 
-        Scraped ${{ steps.check_results.outputs.success_count }}/5 stores
+        Successfully scraped ${{ steps.check_results.outputs.success_count }}/5 stores
         Total products: ${{ steps.check_results.outputs.total_products }}
         
-        Automated scraping via GitHub Actions"
+        📊 Results:
+        $(for store in aldi tesco sainsburys morrisons asda; do
+          if [ -f "app/public/${store}.csv" ]; then
+            lines=$(( $(wc -l < "app/public/${store}.csv") - 1 ))
+            echo "- ${store^}: $lines products"
+          else
+            echo "- ${store^}: Failed"
+          fi
+        done)
+        
+        🤖 Automated scraping via GitHub Actions"
         
         git push
         
-        echo "Changes committed and pushed!"
+        echo "✅ Changes committed and pushed!"
     
     - name: Create summary
       if: always()
       run: |
-        echo "## Weekly Grocery Price Scraping Results" >> $GITHUB_STEP_SUMMARY
+        echo "## 🛒 Weekly Grocery Price Scraping Results" >> $GITHUB_STEP_SUMMARY
         echo "**Completed:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
-        echo "### Results:" >> $GITHUB_STEP_SUMMARY
+        echo "### 📊 Results:" >> $GITHUB_STEP_SUMMARY
         
         for store in aldi tesco sainsburys morrisons asda; do
           if [ -f "app/public/${store}.csv" ]; then
             lines=$(( $(wc -l < "app/public/${store}.csv") - 1 ))
-            echo "- **${store^}**: $lines products" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ **${store^}**: $lines products" >> $GITHUB_STEP_SUMMARY
           else
-            echo "- **${store^}**: Failed" >> $GITHUB_STEP_SUMMARY
+            echo "- ❌ **${store^}**: Failed" >> $GITHUB_STEP_SUMMARY
           fi
         done
         
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Summary:" >> $GITHUB_STEP_SUMMARY
+        echo "### 📈 Summary:" >> $GITHUB_STEP_SUMMARY
         echo "- **Success Rate**: ${{ steps.check_results.outputs.success_count }}/5 stores" >> $GITHUB_STEP_SUMMARY
         echo "- **Total Products**: ${{ steps.check_results.outputs.total_products }}" >> $GITHUB_STEP_SUMMARY
         
         if [ "${{ steps.check_changes.outputs.changes }}" == "true" ]; then
-          echo "- **Status**: New data committed" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ✅ New data committed" >> $GITHUB_STEP_SUMMARY
         else
-          echo "- **Status**: No changes" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ℹ️ No changes detected" >> $GITHUB_STEP_SUMMARY
         fi
