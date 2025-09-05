@@ -1,18 +1,24 @@
-name: ALDI Price Scraper
+name: Grocery Price Scraper - ALDI & Sainsburys
 
 on:
   workflow_dispatch:
   schedule:
     - cron: '0 8 * * 1'
 
+permissions:
+  contents: write
+
 jobs:
-  scrape-aldi:
+  scrape-groceries:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
     
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
     
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -53,94 +59,102 @@ jobs:
         cd WebScrape
         pip install -r requirements.txt
     
-    - name: Fix ALDI scraper for GitHub Actions
+    - name: Fix scrapers for headless mode
       run: |
         cd WebScrape
-        cat > fix_aldi.py << 'EOF'
-        import re
         
-        # Read the current aldi.py file
-        with open('aldi.py', 'r') as f:
-            content = f.read()
+        # Fix ALDI scraper
+        if [ -f "aldi.py" ]; then
+          sed -i 's/# options\.add_argument('\''--headless'\'')/options.add_argument('\''--headless'\'')/' aldi.py
+          sed -i '/options\.add_argument('\''--headless'\'')/a options.add_argument('\''--no-sandbox'\'')' aldi.py
+          sed -i '/options\.add_argument('\''--no-sandbox'\'')/a options.add_argument('\''--disable-dev-shm-usage'\'')' aldi.py
+          echo "ALDI scraper patched for headless mode"
+        fi
         
-        # Enable headless mode
-        content = re.sub(r'# (options\.add_argument\(\'--headless\'\))', r'\1', content)
-        
-        # Add additional headless options
-        if '--no-sandbox' not in content:
-            content = content.replace(
-                'options.add_argument(\'--headless\')',
-                '''options.add_argument('--headless')
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--disable-gpu')'''
-            )
-        
-        # Fix any indentation issues
-        lines = content.split('\n')
-        fixed_lines = []
-        for line in lines:
-            # Fix common indentation issues
-            if 'options.add_argument(' in line and not line.strip().startswith('#'):
-                if not line.startswith('    ') and not line.startswith('\t'):
-                    line = '    ' + line.strip()
-            fixed_lines.append(line)
-        
-        content = '\n'.join(fixed_lines)
-        
-        # Write the fixed file
-        with open('aldi.py', 'w') as f:
-            f.write(content)
-        
-        print("ALDI scraper fixed for headless mode")
-        EOF
-        
-        python fix_aldi.py
+        # Fix Sainsburys scraper
+        if [ -f "sainsburys.py" ]; then
+          sed -i '/options\.add_argument('\''--disable-images'\'')/i options.add_argument('\''--headless'\'')' sainsburys.py
+          sed -i 's/max_workers=[0-9]*/max_workers=1/' sainsburys.py
+          echo "Sainsburys scraper patched for headless mode"
+        fi
     
     - name: Create public directory
       run: mkdir -p app/public
     
-    - name: Run ALDI scraper with virtual display
+    - name: Run ALDI scraper
+      timeout-minutes: 30
+      continue-on-error: true
       run: |
         cd WebScrape
         echo "Starting ALDI scraper..."
-        xvfb-run -a -s "-screen 0 1920x1080x24" python aldi.py
-    
-    - name: Check results and copy CSV
-      run: |
-        echo "Checking for ALDI CSV files..."
+        xvfb-run -a -s "-screen 0 1920x1080x24" python aldi.py > aldi.log 2>&1
         
-        # Check in WebScrape directory
-        if [ -f "WebScrape/aldi.csv" ]; then
-          echo "Found aldi.csv in WebScrape directory"
-          cp WebScrape/aldi.csv app/public/aldi.csv
-        fi
-        
-        # Check if already in app/public
-        if [ -f "app/public/aldi.csv" ]; then
-          lines=$(wc -l < app/public/aldi.csv)
-          echo "✅ ALDI CSV created successfully with $lines lines"
+        if [ -f "aldi.csv" ]; then
+          cp aldi.csv ../app/public/
+          echo "ALDI completed successfully"
         else
-          echo "❌ ALDI CSV not found in either location"
-          echo "Contents of WebScrape directory:"
-          ls -la WebScrape/
-          echo "Contents of app/public directory:"
-          ls -la app/public/
-          exit 1
+          echo "ALDI failed"
         fi
+    
+    - name: Run Sainsbury's scraper
+      timeout-minutes: 60
+      continue-on-error: true
+      run: |
+        cd WebScrape
+        echo "Starting Sainsbury's scraper..."
+        xvfb-run -a -s "-screen 0 1920x1080x24" python sainsburys.py > sainsburys.log 2>&1
+        
+        if [ -f "sainsburys.csv" ]; then
+          cp sainsburys.csv ../app/public/
+          echo "Sainsburys completed successfully"
+        else
+          echo "Sainsburys failed"
+        fi
+    
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: scraper-logs
+        path: WebScrape/*.log
+        retention-days: 7
+        if-no-files-found: ignore
+    
+    - name: Check results
+      id: results
+      run: |
+        success_count=0
+        total_products=0
+        
+        if [ -f "app/public/aldi.csv" ]; then
+          aldi_count=$(wc -l < app/public/aldi.csv)
+          total_products=$((total_products + aldi_count))
+          success_count=$((success_count + 1))
+          echo "ALDI: $aldi_count lines"
+        fi
+        
+        if [ -f "app/public/sainsburys.csv" ]; then
+          sainsburys_count=$(wc -l < app/public/sainsburys.csv)
+          total_products=$((total_products + sainsburys_count))
+          success_count=$((success_count + 1))
+          echo "Sainsburys: $sainsburys_count lines"
+        fi
+        
+        echo "success_count=$success_count" >> $GITHUB_OUTPUT
+        echo "total_products=$total_products" >> $GITHUB_OUTPUT
     
     - name: Commit and push changes
+      if: steps.results.outputs.success_count > '0'
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+        git config --global user.email "actions@github.com"
+        git config --global user.name "GitHub Actions Bot"
         
-        # Force add the CSV file (in case .gitignore blocks it)
-        git add -f app/public/aldi.csv
+        git add -f app/public/*.csv
         
         if ! git diff --staged --quiet; then
-          git commit -m "Update ALDI prices - $(date -u '+%Y-%m-%d %H:%M UTC')"
-          git push
-          echo "✅ Changes committed and pushed"
+          git commit -m "Update grocery prices - $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push origin HEAD:${{ github.ref_name }}
+          echo "Changes committed and pushed"
         else
-          echo "ℹ️ No changes to commit"
+          echo "No changes to commit"
         fi
