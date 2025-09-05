@@ -10,6 +10,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, StaleElementReferenceException
 import threading
+import os
 
 # Set up minimal logging
 logging.basicConfig(level=logging.WARNING)  # Reduced logging level
@@ -158,6 +159,22 @@ def scrape_single_category(url):
     scraper = OptimizedMorrisonsProductScraper(max_scrolls=40)  # Limit scrolls per category
     return scraper.scrape_url(url, category_name)
 
+def save_csv_to_both_locations(df, filename):
+    """Save CSV to both local directory and app/public folder"""
+    # Save to local directory
+    local_path = f"{filename}.csv"
+    df.to_csv(local_path, index=False, encoding="utf-8")
+    print(f"✅ Saved to local: {local_path}")
+    
+    # Save to app/public directory
+    public_dir = "../app/public"
+    if not os.path.exists(public_dir):
+        os.makedirs(public_dir, exist_ok=True)
+    
+    public_path = os.path.join(public_dir, f"{filename}.csv")
+    df.to_csv(public_path, index=False, encoding="utf-8")
+    print(f"✅ Saved to public: {public_path}")
+
 def main():
     """Optimized main function with parallel processing"""
     
@@ -207,7 +224,14 @@ def main():
         cols = ['name', 'price', 'category']
         df = df[[col for col in cols if col in df.columns]]
         
-        df.to_csv("morrisons.csv", index=False, encoding='utf-8')
+        # Clean data
+        df = df.dropna(subset=['name', 'price'])
+        df = df[df['name'].str.strip() != '']
+        df = df[df['price'].str.strip() != '']
+        df = df.drop_duplicates(subset=['name', 'price'])
+        
+        # Save to both locations
+        save_csv_to_both_locations(df, "morrisons")
         
         end_time = time.time()
         duration = end_time - start_time
@@ -217,10 +241,10 @@ def main():
         print(f"Total products: {len(all_products)}")
         print(f"Total time: {duration:.2f} seconds")
         print(f"Products per second: {len(all_products)/duration:.2f}")
-        print(f"File saved: morrisons_optimized.csv")
+        print(f"Files saved: morrisons.csv (local) and ../app/public/morrisons.csv")
         print(f"{'='*50}")
     else:
-        print("No products were scraped. CSV file not generated.")
+        print("No products were scraped. CSV files not generated.")
 
 if __name__ == "__main__":
     main()

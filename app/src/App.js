@@ -7,7 +7,7 @@ import ContactPage from "./components/support";
 
 function App() {
   return (
-    <Router>
+    <Router> {/* Remove any basename - not needed for custom domain */}
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/select-supermarket" element={<SelectSupermarketPage />} />

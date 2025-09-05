@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 import time
 import threading
+import os
 
 # Thread-safe storage
 products_lock = threading.Lock()
@@ -279,6 +280,22 @@ def scrape_single_category(base_url):
         except Exception:
             pass  # Suppress cleanup errors
 
+def save_csv_to_both_locations(df, filename):
+    """Save CSV to both local directory and app/public folder"""
+    # Save to local directory
+    local_path = f"{filename}.csv"
+    df.to_csv(local_path, index=False, encoding="utf-8")
+    print(f"✅ Saved to local: {local_path}")
+    
+    # Save to app/public directory
+    public_dir = "../app/public"
+    if not os.path.exists(public_dir):
+        os.makedirs(public_dir, exist_ok=True)
+    
+    public_path = os.path.join(public_dir, f"{filename}.csv")
+    df.to_csv(public_path, index=False, encoding="utf-8")
+    print(f"✅ Saved to public: {public_path}")
+
 def scrape_sainsburys_optimized():
     """Main function with parallel processing"""
     print("Starting optimized Sainsbury's scraper...")
@@ -308,7 +325,15 @@ def scrape_sainsburys_optimized():
     # Save results
     if all_products:
         df = pd.DataFrame(all_products)
-        df.to_csv("sainsburys.csv", index=False)
+        
+        # Clean data
+        df = df.dropna(subset=['Product Name', 'Price'])
+        df = df[df['Product Name'].str.strip() != '']
+        df = df[df['Price'].str.strip() != '']
+        df = df.drop_duplicates(subset=['Product Name', 'Price'])
+        
+        # Save to both locations
+        save_csv_to_both_locations(df, "sainsburys")
         
         end_time = time.time()
         duration = end_time - start_time
@@ -318,7 +343,7 @@ def scrape_sainsburys_optimized():
         print(f"Total products: {len(all_products)}")
         print(f"Total time: {duration:.2f} seconds")
         print(f"Products per second: {len(all_products)/duration:.2f}")
-        print(f"File saved: sainsburys_optimized_fixed.csv")
+        print(f"Files saved: sainsburys.csv (local) and ../app/public/sainsburys.csv")
         print(f"{'='*50}")
     else:
         print("No products found.")

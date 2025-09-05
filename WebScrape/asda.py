@@ -9,6 +9,8 @@ import threading
 import time
 import pandas as pd
 import re
+import os
+import shutil
 
 # Thread-safe list for collecting products
 products_lock = threading.Lock()
@@ -414,6 +416,22 @@ def scrape_single_category(category_info):
     finally:
         driver.quit()
 
+def save_csv_to_both_locations(df, filename):
+    """Save CSV to both local directory and app/public folder"""
+    # Save to local directory
+    local_path = f"{filename}.csv"
+    df.to_csv(local_path, index=False, encoding="utf-8")
+    print(f"✅ Saved to local: {local_path}")
+    
+    # Save to app/public directory
+    public_dir = "../app/public"
+    if not os.path.exists(public_dir):
+        os.makedirs(public_dir, exist_ok=True)
+    
+    public_path = os.path.join(public_dir, f"{filename}.csv")
+    df.to_csv(public_path, index=False, encoding="utf-8")
+    print(f"✅ Saved to public: {public_path}")
+
 def scrape_asda_parallel():
     """Main function with parallel processing"""
     print("Starting parallel ASDA scraper...")
@@ -468,8 +486,8 @@ def scrape_asda_parallel():
         # Sort by category and name
         df = df.sort_values(['Category', 'Name']).reset_index(drop=True)
         
-        # Save
-        df.to_csv("asda.csv", index=False, encoding="utf-8")
+        # Save to both locations
+        save_csv_to_both_locations(df, "asda")
         
         end_time = time.time()
         duration = end_time - start_time
@@ -479,7 +497,7 @@ def scrape_asda_parallel():
         print(f"Total products: {len(df)}")
         print(f"Total time: {duration:.2f} seconds")
         print(f"Products per second: {len(df)/duration:.2f}")
-        print(f"File saved: asda_products_parallel_complete.csv")
+        print(f"Files saved: asda.csv (local) and ../app/public/asda.csv")
         print(f"{'='*50}")
         print(f"📊 By category:")
         category_counts = df['Category'].value_counts()

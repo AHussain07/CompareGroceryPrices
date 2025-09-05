@@ -6,6 +6,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
+import os
 
 def setup_driver():
     """
@@ -97,6 +98,22 @@ def scrape_aldi_page(url, driver, category_name):
 
     return scraped_data
 
+def save_csv_to_both_locations(df, filename):
+    """Save CSV to both local directory and app/public folder"""
+    # Save to local directory
+    local_path = f"{filename}.csv"
+    df.to_csv(local_path, index=False, encoding="utf-8")
+    print(f"✅ Saved to local: {local_path}")
+    
+    # Save to app/public directory
+    public_dir = "../app/public"
+    if not os.path.exists(public_dir):
+        os.makedirs(public_dir, exist_ok=True)
+    
+    public_path = os.path.join(public_dir, f"{filename}.csv")
+    df.to_csv(public_path, index=False, encoding="utf-8")
+    print(f"✅ Saved to public: {public_path}")
+
 if __name__ == '__main__':
     # --- CONFIGURATION ---
     # List of all the base URLs for the categories you want to scrape.
@@ -155,8 +172,7 @@ if __name__ == '__main__':
         df = pd.DataFrame(all_products_data)
         # Remove duplicate products based on category, combined name, and price
         df.drop_duplicates(subset=['category', 'name', 'price'], inplace=True)
-        df.to_csv(OUTPUT_FILE, index=False, encoding='utf-8-sig')
-        print(f"\nScraping complete. Found {len(df)} unique products across all categories.")
-        print(f"Data saved to {OUTPUT_FILE}")
+        save_csv_to_both_locations(df, "aldi")
+        print(f"Files saved: aldi.csv (local) and ../app/public/aldi.csv")
     else:
         print("Scraping failed or no products were found across all specified URLs.")
