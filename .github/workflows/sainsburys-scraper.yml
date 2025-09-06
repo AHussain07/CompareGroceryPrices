@@ -78,7 +78,7 @@ jobs:
         echo "Installed packages:"
         pip list | grep -E "(selenium|pandas|beautifulsoup|undetected|lxml|requests)"
     
-    - name: Fix Sainsburys for GitHub Actions
+    - name: Fix Sainsburys for GitHub Actions (corrected)
       run: |
         cd WebScrape
         echo "Optimizing Sainsburys scraper for GitHub Actions..."
@@ -86,7 +86,7 @@ jobs:
         # Backup original
         cp sainsburys.py sainsburys.py.backup
         
-        # Create a fixed version
+        # Create a fixed version with proper syntax
         cat > fix_sainsburys.py << 'EOF'
         import re
         
@@ -104,21 +104,23 @@ jobs:
             )
             print("✅ Added headless mode")
         
-        # Add additional stability options for GitHub Actions
-        stability_options = """
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--disable-gpu')
-        options.add_argument('--disable-extensions')
-        options.add_argument('--disable-plugins')"""
+        # Add stability options one by one (safer approach)
+        stability_options = [
+            '--no-sandbox',
+            '--disable-dev-shm-usage', 
+            '--disable-gpu',
+            '--disable-extensions',
+            '--disable-plugins'
+        ]
         
-        if '--no-sandbox' not in content:
-            content = re.sub(
-                r'(options\.add_argument\(\'--disable-images\'\))',
-                r'\1' + stability_options,
-                content
-            )
-            print("✅ Added stability options")
+        for option in stability_options:
+            if option not in content:
+                content = re.sub(
+                    r'(options\.add_argument\(\'--disable-images\'\))',
+                    rf'\1\n    options.add_argument(\'{option}\')',
+                    content
+                )
+                print(f"✅ Added {option}")
         
         # Reduce workers for GitHub Actions
         content = re.sub(r'max_workers=\d+', 'max_workers=1', content)
