@@ -70,20 +70,20 @@ jobs:
         cd WebScrape
         pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pandas selenium undetected-chromedriver psutil
+        pip install pandas selenium beautifulsoup4 lxml requests psutil
         
         echo "Installed packages:"
-        pip list | grep -E "(selenium|pandas|undetected|psutil|beautifulsoup|lxml|requests)"
+        pip list | grep -E "(selenium|pandas|beautifulsoup|lxml|requests|psutil)"
     
-    - name: Optimize Sainsbury's scraper for GitHub Actions
+    - name: Create enhanced Sainsbury's scraper
       run: |
         cd WebScrape
-        echo "Optimizing Sainsbury's scraper for GitHub Actions..."
+        echo "Creating enhanced Sainsbury's scraper for GitHub Actions..."
         
         # Backup original
         cp sainsburys.py sainsburys.py.backup
         
-        # Modify for GitHub Actions environment
+        # Create enhanced version with all categories and better selectors
         cat > sainsburys_github.py << 'EOF'
         import time
         import random
@@ -106,7 +106,9 @@ jobs:
         MAX_THREADS = 3  # GitHub Actions optimized
         BASE_URL = "https://www.sainsburys.co.uk"
         
+        # FULL CATEGORY LIST - All 110 categories
         CATEGORY_URLS = [
+            # Frozen
             "https://www.sainsburys.co.uk/gol-ui/groceries/frozen/chips-potatoes-and-rice/c:1019895",
             "https://www.sainsburys.co.uk/gol-ui/groceries/frozen/desserts-and-pastry/c:1019902",
             "https://www.sainsburys.co.uk/gol-ui/groceries/frozen/fish-and-seafood/c:1019924",
@@ -120,6 +122,8 @@ jobs:
             "https://www.sainsburys.co.uk/gol-ui/groceries/frozen/vegan/c:1019988",
             "https://www.sainsburys.co.uk/gol-ui/groceries/frozen/vegetarian-and-meat-free/c:1019999",
             "https://www.sainsburys.co.uk/gol-ui/groceries/frozen/yorkshire-puddings-and-roast-accompaniments/c:1020000",
+            
+            # Drinks
             "https://www.sainsburys.co.uk/gol-ui/groceries/drinks/tea-coffee-and-hot-drinks/c:1019428",
             "https://www.sainsburys.co.uk/gol-ui/groceries/drinks/squash-and-cordials/c:1019393",
             "https://www.sainsburys.co.uk/gol-ui/groceries/drinks/fizzy-drinks/c:1019310",
@@ -134,14 +138,83 @@ jobs:
             "https://www.sainsburys.co.uk/gol-ui/groceries/drinks/low-and-no-alcohol/c:1019340",
             "https://www.sainsburys.co.uk/gol-ui/groceries/drinks/mixers-and-adult-soft-drinks/c:1019352",
             "https://www.sainsburys.co.uk/gol-ui/groceries/drinks/sports-energy-and-wellbeing/c:1019387",
-            "https://www.sainsburys.co.uk/gol-ui/groceries/drinks/milk-and-milk-drinks/c:1019346"
+            "https://www.sainsburys.co.uk/gol-ui/groceries/drinks/milk-and-milk-drinks/c:1019346",
+            
+            # Food Cupboard
+            "https://www.sainsburys.co.uk/gol-ui/groceries/food-cupboard/biscuits-and-crackers/c:1019495",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/food-cupboard/canned-tinned-and-packaged-foods/c:1019540",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/food-cupboard/cereals/c:1019573",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/food-cupboard/confectionery/c:1019598",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/food-cupboard/cooking-ingredients-and-oils/c:1019630",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/food-cupboard/cooking-sauces-and-meal-kits/c:1019666",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/food-cupboard/crisps-nuts-and-snacking-fruit/c:1019694",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/food-cupboard/food-cupboard-essentials/c:1019697",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/food-cupboard/freefrom/c:1019730",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/food-cupboard/fruit-and-desserts/c:1019744",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/food-cupboard/jams-honey-and-spreads/c:1019754",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/food-cupboard/rice-pasta-and-noodles/c:1019794",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/food-cupboard/stock-up-the-cupboards/c:1019798",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/food-cupboard/sugar-and-home-baking/c:1019837",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/food-cupboard/table-sauces-dressings-and-condiments/c:1019850",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/food-cupboard/tea-coffee-and-hot-drinks/c:1019869",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/food-cupboard/world-foods/c:1019882",
+            
+            # Dairy, Eggs & Chilled
+            "https://www.sainsburys.co.uk/gol-ui/groceries/dairy-eggs-and-chilled/cooked-meats-olives-and-dips/c:1019021",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/dairy-eggs-and-chilled/dairy-and-chilled-essentials/c:1019022",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/dairy-eggs-and-chilled/meal-kits/c:1053925",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/dairy-eggs-and-chilled/dairy-and-eggs/c:1019075",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/dairy-eggs-and-chilled/desserts/c:1019084",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/dairy-eggs-and-chilled/fresh-soup/c:1019093",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/dairy-eggs-and-chilled/fruit-juice-and-drinks/c:1019106",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/dairy-eggs-and-chilled/pies-pasties-and-quiche/c:1019116",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/dairy-eggs-and-chilled/pizza-pasta-and-garlic-bread/c:1019123",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/dairy-eggs-and-chilled/ready-meals/c:1019143",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/dairy-eggs-and-chilled/sandwiches-and-food-to-go/c:1019152",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/dairy-eggs-and-chilled/savoury-snacks/c:1019161",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/dairy-eggs-and-chilled/vegetarian-vegan-and-dairy-free/c:1019176",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/dairy-eggs-and-chilled/world-foods-kosher-and-halal/c:1019183",
+            
+            # Bakery
+            "https://www.sainsburys.co.uk/gol-ui/groceries/bakery/bread/c:1018785",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/bakery/bread-rolls-and-bagels/c:1018791",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/bakery/cakes-and-tarts/c:1018800",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/bakery/croissants-and-breakfast-bakery/c:1018812",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/bakery/doughnuts-cookies-and-muffins/c:1018820",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/bakery/freefrom-bread-and-cakes/c:1018825",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/bakery/from-our-in-store-bakery/c:1018834",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/bakery/naans-and-meal-sides/c:1018841",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/bakery/scones-fruited-and-buns/c:1018850",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/bakery/wraps-thins-and-pittas/c:1018858",
+            
+            # Meat & Fish
+            "https://www.sainsburys.co.uk/gol-ui/groceries/meat-and-fish/bacon-and-sausages/c:1020327",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/meat-and-fish/beef/c:1020335",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/meat-and-fish/chicken/c:1020345",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/meat-and-fish/cooked-meats-ham-and-pate/c:1020370",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/meat-and-fish/duck/c:1054762",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/meat-and-fish/fish-and-seafood/c:1020363",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/meat-and-fish/game-and-venison/c:1020352",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/meat-and-fish/gammon/c:1054771",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/meat-and-fish/just-cook-and-slow-cooked/c:1020371",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/meat-and-fish/lamb/c:1020376",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/meat-and-fish/meat-free/c:1020378",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/meat-and-fish/pork/c:1020384",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/meat-and-fish/turkey/c:1054773",
+            
+            # Fruit & Vegetables
+            "https://www.sainsburys.co.uk/gol-ui/groceries/fruit-and-vegetables/fresh-fruit/c:1020020",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/fruit-and-vegetables/fresh-herbs-and-ingredients/c:1020027",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/fruit-and-vegetables/fresh-salad/c:1020040",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/fruit-and-vegetables/fresh-vegetables/c:1020057",
+            "https://www.sainsburys.co.uk/gol-ui/groceries/fruit-and-vegetables/frozen-fruit-and-vegetables/c:1020067"
         ]
         
         OUTPUT_FILE = "sainsburys.csv"
         APP_OUTPUT_FILE = "../app/public/sainsburys.csv"
         
         def setup_github_driver(thread_id=None):
-            """Setup Chrome driver optimized for GitHub Actions"""
+            """Setup Chrome driver optimized for GitHub Actions with better options"""
             with driver_creation_lock:
                 thread_info = f"[T{thread_id}] " if thread_id else ""
                 
@@ -151,13 +224,19 @@ jobs:
                 options.add_argument("--disable-dev-shm-usage")
                 options.add_argument("--disable-gpu")
                 options.add_argument("--disable-extensions")
-                options.add_argument("--disable-images")
-                options.add_argument("--disable-javascript")
                 options.add_argument("--disable-plugins")
                 options.add_argument("--disable-web-security")
                 options.add_argument("--allow-running-insecure-content")
+                options.add_argument("--disable-blink-features=AutomationControlled")
                 options.add_argument("--window-size=1920,1080")
                 options.add_argument("--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                
+                # Enable JavaScript for dynamic content
+                prefs = {
+                    "profile.managed_default_content_settings.images": 2,  # Block images for speed
+                    "profile.default_content_setting_values.notifications": 2  # Block notifications
+                }
+                options.add_experimental_option("prefs", prefs)
                 
                 # Thread-specific user data directory
                 if thread_id:
@@ -165,425 +244,35 @@ jobs:
                 
                 try:
                     driver = webdriver.Chrome(options=options)
+                    driver.implicitly_wait(10)
                     print(f"{thread_info}✅ Driver created successfully")
                     return driver
                 except Exception as e:
                     print(f"{thread_info}❌ Failed to create driver: {e}")
                     return None
         
-        def check_pagination_status(driver, current_page_products, all_seen_products):
-            """Check if we've reached the last page"""
-            # Check for duplicate products
-            current_product_names = {p["Product Name"] for p in current_page_products}
-            overlap = current_product_names.intersection(all_seen_products)
-            
-            if len(overlap) > len(current_product_names) * 0.5:
-                print(f"   🔄 Detected {len(overlap)} duplicate products - likely reached end")
-                return True
-            
-            # Check for disabled next button
-            try:
-                disabled_selectors = [
-                    'button[rel="next"].ln-c-pagination__link.is-disabled',
-                    'button[rel="next"][disabled]',
-                    'button[rel="next"][aria-disabled="true"]',
-                    '.ln-c-pagination__link[rel="next"].is-disabled'
-                ]
-                
-                for selector in disabled_selectors:
-                    try:
-                        disabled_button = driver.find_element(By.CSS_SELECTOR, selector)
-                        if disabled_button:
-                            print("   ✅ Next button disabled - reached last page")
-                            return True
-                    except:
-                        continue
-                        
-                # Check for enabled next button
-                enabled_selectors = [
-                    'button[rel="next"]:not(.is-disabled):not([disabled])',
-                    '.ln-c-pagination__link[rel="next"]:not(.is-disabled)'
-                ]
-                
-                for selector in enabled_selectors:
-                    try:
-                        enabled_button = driver.find_element(By.CSS_SELECTOR, selector)
-                        if enabled_button and enabled_button.is_enabled():
-                            print("   ➡️ Next button enabled - more pages available")
-                            return False
-                    except:
-                        continue
-                        
-                print("   ✅ No enabled next button - reached last page")
-                return True
-                
-            except Exception as e:
-                print(f"   ⚠️ Error checking pagination: {e}")
-                return True
-                
-            return False
-        
-        def scrape_category(driver, url, thread_id=None):
-            """Scrape all pages from a category"""
-            products = []
-            page = 1
-            all_seen_product_names = set()
-            consecutive_duplicate_pages = 0
-            max_pages = 15  # GitHub Actions limit
-            
-            thread_info = f"[T{thread_id}] " if thread_id else ""
-            
-            # Extract category name
-            category_name = url.split("/")[-1]
-            if category_name.startswith("c:"):
-                category_name = url.split("/")[-2]
-            
-            print(f"{thread_info}🛒 Starting category: {category_name}")
-            
-            while page <= max_pages:
-                try:
-                    paged_url = f"{url}?page={page}"
-                    print(f"{thread_info}   📄 Scraping page {page}...")
-                    
-                    driver.get(paged_url)
-                    time.sleep(random.uniform(2.0, 4.0))  # GitHub Actions timing
-                    
-                    # Wait for products
-                    try:
-                        WebDriverWait(driver, 15).until(
-                            EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".pt__content"))
-                        )
-                    except:
-                        print(f"{thread_info}   ⚠️ No products found on page {page}")
-                        break
-                    
-                    product_elements = driver.find_elements(By.CSS_SELECTOR, ".pt__content")
-                    if not product_elements:
-                        print(f"{thread_info}   ⚠️ No product elements found")
-                        break
-                    
-                    page_products = []
-                    for product in product_elements:
-                        try:
-                            name = product.find_element(By.CSS_SELECTOR, ".pt__info a").text.strip()
-                            price_text = product.find_element(By.CSS_SELECTOR, ".pt__cost").text.strip()
-                            
-                            # Nectar price
-                            try:
-                                nectar_text = product.find_element(By.CSS_SELECTOR, ".promotion .price-per-item").text.strip()
-                            except:
-                                nectar_text = ""
-                            
-                            if name and price_text:
-                                page_products.append({
-                                    "Category": category_name,
-                                    "Product Name": name,
-                                    "Price": price_text,
-                                    "Price with Nectar": nectar_text
-                                })
-                        except:
-                            continue
-                    
-                    print(f"{thread_info}   ✅ Found {len(page_products)} products on page {page}")
-                    
-                    # Check pagination
-                    if check_pagination_status(driver, page_products, all_seen_product_names):
-                        print(f"{thread_info}   🏁 Reached last page for {category_name}")
-                        break
-                    
-                    # Add new products only
-                    new_products = []
-                    for product in page_products:
-                        if product["Product Name"] not in all_seen_product_names:
-                            new_products.append(product)
-                            all_seen_product_names.add(product["Product Name"])
-                    
-                    products.extend(new_products)
-                    
-                    if len(new_products) == 0:
-                        consecutive_duplicate_pages += 1
-                        if consecutive_duplicate_pages >= 2:
-                            print(f"{thread_info}   🛑 Stopping - consecutive duplicate pages")
-                            break
-                    else:
-                        consecutive_duplicate_pages = 0
-                        print(f"{thread_info}   ➕ Added {len(new_products)} new products")
-                    
-                    page += 1
-                    time.sleep(random.uniform(2.0, 4.0))
-                    
-                except Exception as e:
-                    print(f"{thread_info}   ❌ Error on page {page}: {e}")
-                    break
-            
-            print(f"{thread_info}✅ Category {category_name} completed: {len(products)} products\n")
-            return products
-        
-        def scrape_single_category(url_and_thread):
-            """Thread worker function"""
-            url, thread_id = url_and_thread
-            thread_info = f"[T{thread_id}] "
-            
-            driver = setup_github_driver(thread_id)
-            if not driver:
-                print(f"{thread_info}❌ Failed to create driver for {url}")
-                return []
+        def test_page_selectors(driver, url):
+            """Test different selectors to find the correct ones"""
+            print(f"🔍 Testing selectors for: {url}")
             
             try:
-                products = scrape_category(driver, url, thread_id)
-                return products
-            finally:
-                try:
-                    driver.quit()
-                except:
-                    pass
-                # Cleanup
-                import shutil
-                user_data_dir = f"/tmp/chrome_data_{thread_id}"
-                try:
-                    if os.path.exists(user_data_dir):
-                        shutil.rmtree(user_data_dir)
-                except:
-                    pass
-                time.sleep(1)
-        
-        def scrape_all_categories():
-            """Main scraping function with threading"""
-            all_products = []
-            
-            print(f"🧵 Using {MAX_THREADS} threads for parallel processing")
-            
-            # Create URL and thread ID pairs
-            url_thread_pairs = [(url, i % MAX_THREADS + 1) for i, url in enumerate(CATEGORY_URLS)]
-            
-            with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
-                future_to_url = {
-                    executor.submit(scrape_single_category, url_thread_pair): url_thread_pair[0] 
-                    for url_thread_pair in url_thread_pairs
-                }
+                driver.get(url)
+                time.sleep(5)  # Wait for page load
                 
-                for i, future in enumerate(as_completed(future_to_url), 1):
-                    url = future_to_url[future]
+                # Test different product selectors
+                selectors_to_test = [
+                    ".pt__content",  # Original
+                    "[data-testid='product-tile']",
+                    ".product-tile",
+                    ".pt",
+                    ".gridItem",
+                    "[data-module='product-tile']",
+                    ".productNameAndPromotions",
+                    ".product"
+                ]
+                
+                for selector in selectors_to_test:
                     try:
-                        products = future.result()
-                        all_products.extend(products)
-                        print(f"📊 Progress: {i}/{len(CATEGORY_URLS)} categories completed")
-                    except Exception as e:
-                        print(f"❌ Error scraping category {url}: {e}")
-            
-            return all_products
-        
-        def save_products(products):
-            """Save to CSV files"""
-            if not products:
-                print("❌ No products found.")
-                return
-            
-            fieldnames = ["Category", "Product Name", "Price", "Price with Nectar"]
-            
-            # Save locally
-            with open(OUTPUT_FILE, "w", newline="", encoding="utf-8") as f:
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                writer.writeheader()
-                writer.writerows(products)
-            
-            # Save to app/public
-            os.makedirs(os.path.dirname(APP_OUTPUT_FILE), exist_ok=True)
-            with open(APP_OUTPUT_FILE, "w", newline="", encoding="utf-8") as f:
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                writer.writeheader()
-                writer.writerows(products)
-            
-            print(f"✅ Files saved: {OUTPUT_FILE} (local) and {APP_OUTPUT_FILE}")
-        
-        def main():
-            print("🛒 Starting Sainsbury's scraper (GitHub Actions)...")
-            print(f"📋 Categories to scrape: {len(CATEGORY_URLS)}")
-            print(f"🧵 Max threads: {MAX_THREADS}")
-            print(f"🔧 Driver: Standard Selenium ChromeDriver")
-            print(f"📄 Pagination: Duplicate detection + button status")
-            print(f"🛑 Safety: Max 15 pages per category\n")
-            
-            start_time = time.time()
-            products = scrape_all_categories()
-            elapsed = time.time() - start_time
-            
-            save_products(products)
-            
-            print("\n" + "="*60)
-            print("🎉 SCRAPING COMPLETED!")
-            print(f"📊 Total products: {len(products)}")
-            print(f"⏱️ Total time: {elapsed:.2f} seconds")
-            if products:
-                print(f"🚀 Products per second: {len(products)/elapsed:.2f}")
-            print("="*60)
-        
-        if __name__ == "__main__":
-            main()
-        EOF
-        
-        echo "✅ Created GitHub Actions optimized version:"
-        echo "- Standard Selenium ChromeDriver (no undetected-chromedriver)"
-        echo "- Headless mode enabled"
-        echo "- 3 parallel workers"
-        echo "- All categories included"
-        echo "- Enhanced error handling"
-    
-    - name: Create public directory
-      run: mkdir -p app/public
-    
-    - name: Run Sainsbury's scraper (parallel processing)
-      timeout-minutes: 115
-      run: |
-        cd WebScrape
-        echo "🛒 Starting Sainsbury's scraper..."
-        echo "📋 Mode: Static category list (110 categories)"
-        echo "👥 Workers: 3 (parallel processing)"
-        echo "📄 Pages: Full pagination per category"
-        echo "🕐 Started: $(date)"
-        
-        # Set display for virtual framebuffer
-        export DISPLAY=:99
-        
-        # Start virtual display
-        Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
-        sleep 5
-        
-        # Run GitHub Actions optimized scraper
-        echo "Executing: python sainsburys_github.py"
-        timeout 6900 python sainsburys_github.py 2>&1 | tee sainsburys.log
-        
-        echo "Sainsbury's scraper completed at: $(date)"
-    
-    - name: Check results and copy CSV
-      id: results
-      run: |
-        cd WebScrape
-        
-        echo "Checking for output files..."
-        ls -la *.csv 2>/dev/null || echo "No CSV files found"
-        
-        if [ -f "sainsburys.csv" ]; then
-          echo "✅ Found sainsburys.csv"
-          
-          # Copy to public directory
-          cp sainsburys.csv ../app/public/
-          echo "✅ Copied to app/public/"
-          
-          # Get detailed stats
-          total_lines=$(wc -l < sainsburys.csv)
-          product_count=$((total_lines - 1))
-          file_size=$(ls -lh sainsburys.csv | awk '{print $5}')
-          
-          echo "📊 Results:"
-          echo "- Products: $product_count"
-          echo "- File size: $file_size"
-          echo "- Total lines: $total_lines"
-          
-          # Set outputs
-          echo "success=true" >> $GITHUB_OUTPUT
-          echo "product_count=$product_count" >> $GITHUB_OUTPUT
-          
-          # Show sample products
-          echo ""
-          echo "📋 Sample products (first 5):"
-          head -6 sainsburys.csv | tail -5
-          
-          # Show category breakdown
-          echo ""
-          echo "📊 Categories breakdown:"
-          tail -n +2 sainsburys.csv | cut -d',' -f1 | sort | uniq -c | sort -nr | head -10
-          
-          # Show performance stats from log
-          echo ""
-          echo "📊 Performance stats:"
-          grep -E "Total products:|Total time:|Products per second:" sainsburys.log | tail -3
-          
-        else
-          echo "❌ No sainsburys.csv found"
-          echo ""
-          echo "📋 Directory contents:"
-          ls -la
-          echo ""
-          echo "📋 Last 50 lines of log:"
-          tail -50 sainsburys.log 2>/dev/null || echo "No log file"
-          
-          echo "success=false" >> $GITHUB_OUTPUT
-          echo "product_count=0" >> $GITHUB_OUTPUT
-        fi
-    
-    - name: Upload logs and backup
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: sainsburys-logs-and-backup
-        path: |
-          WebScrape/sainsburys.log
-          WebScrape/sainsburys.py.backup
-          WebScrape/sainsburys_github.py
-        retention-days: 7
-        if-no-files-found: ignore
-    
-    - name: Commit changes if successful
-      if: steps.results.outputs.success == 'true'
-      run: |
-        git config --global user.email "actions@github.com"
-        git config --global user.name "GitHub Actions - Sainsburys"
-        
-        # Add CSV file
-        git add -f app/public/sainsburys.csv
-        
-        if ! git diff --staged --quiet; then
-          echo "📝 Committing changes..."
-          
-          git commit -m "🛒 Sainsbury's price update - $(date -u '+%Y-%m-%d %H:%M UTC')
-
-          Products: ${{ steps.results.outputs.product_count }}
-          Store: Sainsbury's (110 categories)
-          Workers: 3 (parallel processing)
-          Method: Static category list
-          
-          Features:
-          - Parallel processing with 3 workers
-          - Comprehensive category coverage
-          - Full pagination scraping
-          - Nectar price extraction
-          - Duplicate detection
-          
-          Auto-updated via GitHub Actions"
-          
-          git push origin HEAD:${{ github.ref_name }}
-          echo "✅ Changes pushed successfully"
-        else
-          echo "ℹ️ No changes to commit"
-        fi
-    
-    - name: Summary
-      if: always()
-      run: |
-        echo "## 🛒 Sainsbury's Scraper Summary" >> $GITHUB_STEP_SUMMARY
-        echo "**Run completed:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        
-        if [ "${{ steps.results.outputs.success }}" == "true" ]; then
-          echo "### ✅ Success" >> $GITHUB_STEP_SUMMARY
-          echo "- **Products scraped:** ${{ steps.results.outputs.product_count }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Categories:** 110 predefined categories" >> $GITHUB_STEP_SUMMARY
-          echo "- **Workers:** 3 parallel threads" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status:** Data committed to repository" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "### ❌ Scraping Failed" >> $GITHUB_STEP_SUMMARY
-          echo "- **Error:** Failed to generate CSV file" >> $GITHUB_STEP_SUMMARY
-          echo "- **Logs:** Check uploaded artifacts for details" >> $GITHUB_STEP_SUMMARY
-          echo "- **Workers:** 3 parallel threads attempted" >> $GITHUB_STEP_SUMMARY
-        fi
-        
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 📋 Technical Details" >> $GITHUB_STEP_SUMMARY
-        echo "- **Driver:** Standard Selenium ChromeDriver" >> $GITHUB_STEP_SUMMARY
-        echo "- **Mode:** Headless (GitHub Actions optimized)" >> $GITHUB_STEP_SUMMARY
-        echo "- **Processing:** Parallel with 3 workers" >> $GITHUB_STEP_SUMMARY
-        echo "- **Categories:** 110 static predefined URLs" >> $GITHUB_STEP_SUMMARY
-        echo "- **Pagination:** Full scraping with duplicate detection" >> $GITHUB_STEP_SUMMARY
-        echo "- **Features:** Nectar price extraction included" >> $GITHUB_STEP_SUMMARY
-        echo "- **Timeout:** 2 hours total" >> $GITHUB_STEP_SUMMARY
+                        elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                        if elements:
+                         
