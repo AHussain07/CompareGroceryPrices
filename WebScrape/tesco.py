@@ -28,8 +28,10 @@ def setup_optimized_driver():
     options.add_argument('--disable-background-timer-throttling')
     options.add_argument('--disable-renderer-backgrounding')
     options.add_argument('--disable-backgrounding-occluded-windows')
-    
-    return uc.Chrome(options=options)
+
+    # Force uc to fetch a ChromeDriver matching your Chrome version (e.g., 139)
+    return uc.Chrome(version_main=139, options=options)
+
 
 def scrape_single_category(base_url, category_name):
     """Scrape a single category with optimizations"""
