@@ -1,0 +1,146 @@
+name: ALDI Price Scraper
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 8 * * 1'
+
+jobs:
+  scrape-aldi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget curl unzip xvfb
+    
+    - name: Install Chrome
+      run: |
+        wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+        echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+    
+    - name: Install ChromeDriver
+      run: |
+        CHROME_VERSION=$(google-chrome --version | sed 's/Google Chrome //' | cut -d'.' -f1)
+        
+        if [ "$CHROME_VERSION" -ge "115" ]; then
+          LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE")
+          wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$LATEST_VERSION/linux64/chromedriver-linux64.zip"
+          sudo unzip /tmp/chromedriver.zip -d /tmp/
+          sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
+        else
+          DRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
+          wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${DRIVER_VERSION}/chromedriver_linux64.zip"
+          sudo unzip /tmp/chromedriver.zip -d /usr/local/bin/
+        fi
+        
+        sudo chmod +x /usr/local/bin/chromedriver
+    
+    - name: Install dependencies
+      run: |
+        cd WebScrape
+        pip install -r requirements.txt
+    
+    - name: Fix ALDI scraper for GitHub Actions
+      run: |
+        cd WebScrape
+        cat > fix_aldi.py << 'EOF'
+        import re
+        
+        # Read the current aldi.py file
+        with open('aldi.py', 'r') as f:
+            content = f.read()
+        
+        # Enable headless mode
+        content = re.sub(r'# (options\.add_argument\(\'--headless\'\))', r'\1', content)
+        
+        # Add additional headless options
+        if '--no-sandbox' not in content:
+            content = content.replace(
+                'options.add_argument(\'--headless\')',
+                '''options.add_argument('--headless')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')'''
+            )
+        
+        # Fix any indentation issues
+        lines = content.split('\n')
+        fixed_lines = []
+        for line in lines:
+            # Fix common indentation issues
+            if 'options.add_argument(' in line and not line.strip().startswith('#'):
+                if not line.startswith('    ') and not line.startswith('\t'):
+                    line = '    ' + line.strip()
+            fixed_lines.append(line)
+        
+        content = '\n'.join(fixed_lines)
+        
+        # Write the fixed file
+        with open('aldi.py', 'w') as f:
+            f.write(content)
+        
+        print("ALDI scraper fixed for headless mode")
+        EOF
+        
+        python fix_aldi.py
+    
+    - name: Create public directory
+      run: mkdir -p app/public
+    
+    - name: Run ALDI scraper with virtual display
+      run: |
+        cd WebScrape
+        echo "Starting ALDI scraper..."
+        xvfb-run -a -s "-screen 0 1920x1080x24" python aldi.py
+    
+    - name: Check results and copy CSV
+      run: |
+        echo "Checking for ALDI CSV files..."
+        
+        # Check in WebScrape directory
+        if [ -f "WebScrape/aldi.csv" ]; then
+          echo "Found aldi.csv in WebScrape directory"
+          cp WebScrape/aldi.csv app/public/aldi.csv
+        fi
+        
+        # Check if already in app/public
+        if [ -f "app/public/aldi.csv" ]; then
+          lines=$(wc -l < app/public/aldi.csv)
+          echo "✅ ALDI CSV created successfully with $lines lines"
+        else
+          echo "❌ ALDI CSV not found in either location"
+          echo "Contents of WebScrape directory:"
+          ls -la WebScrape/
+          echo "Contents of app/public directory:"
+          ls -la app/public/
+          exit 1
+        fi
+    
+    - name: Commit and push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # Force add the CSV file (in case .gitignore blocks it)
+        git add -f app/public/aldi.csv
+        
+        if ! git diff --staged --quiet; then
+          git commit -m "Update ALDI prices - $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push
+          echo "✅ Changes committed and pushed"
+        else
+          echo "ℹ️ No changes to commit"
+        fi
