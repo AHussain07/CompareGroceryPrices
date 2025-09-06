@@ -25,10 +25,12 @@ jobs:
       with:
         python-version: '3.11'
     
-    - name: Install system dependencies
+    - name: Install system dependencies (robust)
       run: |
-        sudo apt-get update
-        sudo apt-get install -y wget curl unzip xvfb libnss3-dev libgconf-2-4 libxss1 libappindicator1 libindicator7
+        sudo apt-get clean
+        sudo apt-get update --fix-missing
+        sudo apt-get install -y --fix-broken wget curl unzip xvfb
+        sudo apt-get install -y --no-install-recommends libnss3-dev libatk-bridge2.0-0 libdrm2 libxkbcommon0 libgtk-3-0 libatspi2.0-0
     
     - name: Install Chrome
       run: |
@@ -41,14 +43,19 @@ jobs:
     - name: Install ChromeDriver
       run: |
         CHROME_VERSION=$(google-chrome --version | sed 's/Google Chrome //' | cut -d'.' -f1)
+        echo "Chrome version: $CHROME_VERSION"
         
         if [ "$CHROME_VERSION" -ge "115" ]; then
+          echo "Using new ChromeDriver API"
           LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE")
+          echo "ChromeDriver version: $LATEST_VERSION"
           wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$LATEST_VERSION/linux64/chromedriver-linux64.zip"
           sudo unzip /tmp/chromedriver.zip -d /tmp/
           sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
         else
+          echo "Using legacy ChromeDriver API"
           DRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
+          echo "ChromeDriver version: $DRIVER_VERSION"
           wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${DRIVER_VERSION}/chromedriver_linux64.zip"
           sudo unzip /tmp/chromedriver.zip -d /usr/local/bin/
         fi
@@ -61,44 +68,33 @@ jobs:
         cd WebScrape
         pip install --upgrade pip
         pip install -r requirements.txt
+        echo "Installed packages:"
+        pip list | grep -E "(selenium|beautifulsoup|pandas|undetected|lxml|requests)"
     
-    - name: Optimize Morrisons scraper for GitHub Actions
+    - name: Simple Morrisons optimization
       run: |
         cd WebScrape
-        cat > optimize_morrisons.py << 'EOF'
-        import re
+        echo "Checking Morrisons scraper..."
         
-        # Read the morrisons.py file
-        with open('morrisons.py', 'r') as f:
-            content = f.read()
-        
-        print("Optimizing Morrisons scraper for GitHub Actions...")
-        
-        # Reduce max_workers for GitHub Actions stability (but keep all categories)
-        content = re.sub(r'max_workers=\d+', 'max_workers=2', content)
-        
-        # Slightly reduce max_scrolls per category for faster execution but keep comprehensive
-        content = re.sub(r'max_scrolls=\d+', 'max_scrolls=35', content)
-        
-        # Optimize sleep times for GitHub Actions
-        content = content.replace('time.sleep(1.0)', 'time.sleep(0.8)')
-        content = content.replace('time.sleep(1)', 'time.sleep(0.8)')
-        
-        # Don't remove any categories - keep all 11 categories for comprehensive data
-        print("✅ Keeping all 11 categories for comprehensive price data")
-        
-        # Write the optimized file
-        with open('morrisons.py', 'w') as f:
-            f.write(content)
-        
-        print("✅ Morrisons scraper optimized for GitHub Actions")
-        print("- Reduced workers to 2 for stability")
-        print("- Reduced max scrolls to 35 per category")
-        print("- Faster sleep intervals")
-        print("- Keeping ALL 11 categories for complete data coverage")
-        EOF
-        
-        python optimize_morrisons.py
+        # Simple sed-based optimization (safer than Python script)
+        if [ -f "morrisons.py" ]; then
+          # Backup original
+          cp morrisons.py morrisons.py.backup
+          
+          # Reduce workers to 2 for GitHub Actions
+          sed -i 's/max_workers=[0-9]*/max_workers=2/g' morrisons.py
+          
+          # Reduce max_scrolls slightly
+          sed -i 's/max_scrolls=[0-9]*/max_scrolls=30/g' morrisons.py
+          
+          echo "✅ Morrisons scraper optimized:"
+          echo "- Set max_workers=2"
+          echo "- Set max_scrolls=30"
+          echo "- Keeping all categories"
+        else
+          echo "❌ morrisons.py not found"
+          exit 1
+        fi
     
     - name: Create public directory
       run: mkdir -p app/public
@@ -108,142 +104,117 @@ jobs:
       run: |
         cd WebScrape
         echo "🛒 Starting Morrisons scraper..."
-        echo "📋 Categories to scrape: ALL 11 categories"
-        echo "🕐 Estimated time: 45-55 minutes"
+        echo "Time: $(date)"
         
-        # Run with virtual display and capture output
-        xvfb-run -a -s "-screen 0 1920x1080x24" python morrisons.py > morrisons.log 2>&1
+        # Set display for virtual framebuffer
+        export DISPLAY=:99
         
-        echo "Morrisons scraper completed. Checking results..."
+        # Start virtual display
+        Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
+        sleep 3
+        
+        # Run scraper with timeout and detailed logging
+        echo "Running python morrisons.py..."
+        timeout 3300 python morrisons.py 2>&1 | tee morrisons.log
+        
+        echo "Scraper completed at: $(date)"
     
     - name: Check results and copy CSV
       id: results
       run: |
         cd WebScrape
         
-        # Check if CSV was created
+        echo "Checking for output files..."
+        ls -la *.csv 2>/dev/null || echo "No CSV files found"
+        
         if [ -f "morrisons.csv" ]; then
+          echo "✅ Found morrisons.csv"
+          
           # Copy to public directory
           cp morrisons.csv ../app/public/
+          echo "✅ Copied to app/public/"
           
-          # Get product count
+          # Get stats
           total_lines=$(wc -l < morrisons.csv)
-          product_count=$((total_lines - 1))  # Subtract header
+          product_count=$((total_lines - 1))
+          file_size=$(ls -lh morrisons.csv | awk '{print $5}')
           
-          echo "✅ Morrisons scraping successful!"
-          echo "📊 Products scraped: $product_count"
-          echo "📁 CSV saved to both locations"
+          echo "📊 Results:"
+          echo "- Products: $product_count"
+          echo "- File size: $file_size"
+          echo "- Total lines: $total_lines"
           
-          # Output for later steps
+          # Set outputs
           echo "success=true" >> $GITHUB_OUTPUT
           echo "product_count=$product_count" >> $GITHUB_OUTPUT
           
-          # Show sample of results
+          # Show first few lines
           echo ""
-          echo "📋 Sample products (first 5):"
-          head -6 morrisons.csv
-          
-          # Show category breakdown
-          echo ""
-          echo "📊 Products per category:"
-          tail -n +2 morrisons.csv | cut -d',' -f3 | sort | uniq -c | sort -nr
+          echo "📋 First 3 products:"
+          head -4 morrisons.csv | tail -3
           
         else
-          echo "❌ Morrisons scraping failed - no CSV generated"
-          echo "📋 Last 30 lines of log:"
-          tail -30 morrisons.log 2>/dev/null || echo "No log file found"
+          echo "❌ No morrisons.csv found"
+          echo ""
+          echo "📋 Directory contents:"
+          ls -la
+          echo ""
+          echo "📋 Last 20 lines of log:"
+          tail -20 morrisons.log 2>/dev/null || echo "No log file"
           
           echo "success=false" >> $GITHUB_OUTPUT
           echo "product_count=0" >> $GITHUB_OUTPUT
-          exit 1
         fi
     
-    - name: Upload scraper logs
+    - name: Upload logs and backup
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: morrisons-scraper-logs
-        path: WebScrape/morrisons.log
+        name: morrisons-logs-and-backup
+        path: |
+          WebScrape/morrisons.log
+          WebScrape/morrisons.py.backup
         retention-days: 7
         if-no-files-found: ignore
     
-    - name: Commit and push changes
+    - name: Commit changes if successful
       if: steps.results.outputs.success == 'true'
       run: |
         git config --global user.email "actions@github.com"
-        git config --global user.name "GitHub Actions - Morrisons Bot"
+        git config --global user.name "GitHub Actions - Morrisons"
         
-        # Add the CSV file
+        # Add CSV file
         git add -f app/public/morrisons.csv
         
-        # Check if there are changes to commit
         if ! git diff --staged --quiet; then
-          echo "📝 Committing Morrisons price data..."
+          echo "📝 Committing changes..."
           
-          git commit -m "🛒 Update Morrisons prices - $(date -u '+%Y-%m-%d %H:%M UTC')
+          git commit -m "🛒 Morrisons price update - $(date -u '+%Y-%m-%d %H:%M UTC')
 
-          📊 Products scraped: ${{ steps.results.outputs.product_count }}
-          🏪 Store: Morrisons
-          🤖 Automated scraping via GitHub Actions
+          Products: ${{ steps.results.outputs.product_count }}
+          Store: Morrisons (all categories)
           
-          📋 All 11 Categories Included:
-          • Fruit, Veg & Flowers
-          • Meat & Poultry  
-          • Fish & Seafood
-          • Fresh & Chilled Foods
-          • Bakery & Cakes
-          • Frozen Food
-          • Food Cupboard
-          • Dietary & Lifestyle Foods
-          • World Foods
-          • Drinks
-          • Beer, Wines & Spirits"
+          Auto-updated via GitHub Actions"
           
-          echo "📤 Pushing changes to repository..."
           git push origin HEAD:${{ github.ref_name }}
-          echo "✅ Morrisons data committed and pushed successfully!"
-          
+          echo "✅ Changes pushed successfully"
         else
-          echo "ℹ️ No changes detected - CSV content unchanged"
+          echo "ℹ️ No changes to commit"
         fi
     
-    - name: Create job summary
+    - name: Summary
       if: always()
       run: |
-        echo "## 🛒 Morrisons Price Scraping Results" >> $GITHUB_STEP_SUMMARY
-        echo "**Completed:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+        echo "## 🛒 Morrisons Scraper Summary" >> $GITHUB_STEP_SUMMARY
+        echo "**Run completed:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
         if [ "${{ steps.results.outputs.success }}" == "true" ]; then
-          echo "### ✅ Scraping Successful" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Success" >> $GITHUB_STEP_SUMMARY
           echo "- **Products scraped:** ${{ steps.results.outputs.product_count }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Categories:** All 11 main categories" >> $GITHUB_STEP_SUMMARY
-          echo "- **File location:** \`app/public/morrisons.csv\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** Data committed to repository" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📊 Categories Scraped" >> $GITHUB_STEP_SUMMARY
-          echo "1. Fruit, Veg & Flowers" >> $GITHUB_STEP_SUMMARY
-          echo "2. Meat & Poultry" >> $GITHUB_STEP_SUMMARY
-          echo "3. Fish & Seafood" >> $GITHUB_STEP_SUMMARY
-          echo "4. Fresh & Chilled Foods" >> $GITHUB_STEP_SUMMARY
-          echo "5. Bakery & Cakes" >> $GITHUB_STEP_SUMMARY
-          echo "6. Frozen Food" >> $GITHUB_STEP_SUMMARY
-          echo "7. Food Cupboard" >> $GITHUB_STEP_SUMMARY
-          echo "8. Dietary & Lifestyle Foods" >> $GITHUB_STEP_SUMMARY
-          echo "9. World Foods" >> $GITHUB_STEP_SUMMARY
-          echo "10. Drinks" >> $GITHUB_STEP_SUMMARY
-          echo "11. Beer, Wines & Spirits" >> $GITHUB_STEP_SUMMARY
         else
-          echo "### ❌ Scraping Failed" >> $GITHUB_STEP_SUMMARY
-          echo "- **Error:** Failed to generate CSV file" >> $GITHUB_STEP_SUMMARY
-          echo "- **Logs:** Check uploaded artifacts for details" >> $GITHUB_STEP_SUMMARY
-          echo "- **Next action:** Review logs and retry manually" >> $GITHUB_STEP_SUMMARY
+          echo "### ❌ Failed" >> $GITHUB_STEP_SUMMARY
+          echo "- **Issue:** Scraping failed or no CSV generated" >> $GITHUB_STEP_SUMMARY
+          echo "- **Action:** Check uploaded logs for details" >> $GITHUB_STEP_SUMMARY
         fi
-        
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 📋 Workflow Details" >> $GITHUB_STEP_SUMMARY
-        echo "- **Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Runner:** Ubuntu Latest" >> $GITHUB_STEP_SUMMARY
-        echo "- **Timeout:** 60 minutes" >> $GITHUB_STEP_SUMMARY
-        echo "- **Parallel workers:** 2" >> $GITHUB_STEP_SUMMARY
