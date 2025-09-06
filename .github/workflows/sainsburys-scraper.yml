@@ -76,70 +76,132 @@ jobs:
         echo "Installed packages:"
         pip list | grep -E "(selenium|pandas|beautifulsoup|undetected|lxml|requests)"
     
-    - name: Simple Sainsburys optimization (sed approach)
+    - name: Enhanced Sainsburys optimization for stealth
       run: |
         cd WebScrape
-        echo "Optimizing Sainsburys scraper with simple sed commands..."
+        echo "Applying enhanced optimizations for Sainsburys..."
         
         # Backup original
         cp sainsburys.py sainsburys.py.backup
         
-        # Add headless mode if not present
-        if ! grep -q "headless" sainsburys.py; then
-          sed -i '/options\.add_argument('\''--disable-images'\'')/i\    options.add_argument('\''--headless'\'')' sainsburys.py
-          echo "✅ Added headless mode"
-        fi
+        # Create enhanced version with better stealth
+        cat > enhance_sainsburys.py << 'EOF'
+        import re
         
-        # Add no-sandbox if not present
-        if ! grep -q "no-sandbox" sainsburys.py; then
-          sed -i '/options\.add_argument('\''--disable-images'\'')/a\    options.add_argument('\''--no-sandbox'\'')' sainsburys.py
-          echo "✅ Added --no-sandbox"
-        fi
+        with open('sainsburys.py', 'r') as f:
+            content = f.read()
         
-        # Add disable-dev-shm-usage if not present
-        if ! grep -q "disable-dev-shm-usage" sainsburys.py; then
-          sed -i '/options\.add_argument('\''--disable-images'\'')/a\    options.add_argument('\''--disable-dev-shm-usage'\'')' sainsburys.py
-          echo "✅ Added --disable-dev-shm-usage"
-        fi
+        print("Applying enhanced Sainsburys optimizations...")
         
-        # Reduce workers to 1
-        sed -i 's/max_workers=[0-9]*/max_workers=1/g' sainsburys.py
-        echo "✅ Set max_workers=1"
+        # Remove headless mode temporarily for debugging
+        content = re.sub(r"options\.add_argument\('--headless'\)", "", content)
+        print("❌ Removed headless mode for debugging")
         
-        echo "✅ Sainsburys scraper optimized for GitHub Actions"
+        # Add better stealth options
+        stealth_options = [
+            "--disable-blink-features=AutomationControlled",
+            "--disable-web-security",
+            "--allow-running-insecure-content",
+            "--disable-features=VizDisplayCompositor",
+            "--disable-ipc-flooding-protection"
+        ]
+        
+        # Find the options setup section
+        for option in stealth_options:
+            if option not in content:
+                content = re.sub(
+                    r'(options\.add_argument\(\'--disable-images\'\))',
+                    rf'\1\n    options.add_argument(\'{option}\')',
+                    content
+                )
+                print(f"✅ Added {option}")
+        
+        # Reduce workers to 1 for stability
+        content = re.sub(r'max_workers=\d+', 'max_workers=1', content)
+        print("✅ Set max_workers=1")
+        
+        # Add longer waits between requests
+        content = re.sub(r'time\.sleep\(0\.3\)', 'time.sleep(2.0)', content)
+        content = re.sub(r'time\.sleep\(1\)', 'time.sleep(3.0)', content)
+        print("✅ Increased wait times")
+        
+        # Limit to fewer categories for testing
+        content = re.sub(r'max_pages = \d+', 'max_pages = 2', content)
+        print("✅ Limited to 2 pages per category for testing")
+        
+        with open('sainsburys.py', 'w') as f:
+            f.write(content)
+        
+        print("✅ Enhanced Sainsburys scraper for better stealth")
+        EOF
+        
+        python enhance_sainsburys.py
     
     - name: Create public directory
       run: mkdir -p app/public
     
-    - name: Run Sainsburys scraper
+    - name: Run Sainsburys scraper (enhanced stealth mode)
       timeout-minutes: 115
       run: |
         cd WebScrape
-        echo "🛒 Starting Sainsburys scraper..."
+        echo "🛒 Starting Sainsburys scraper (enhanced stealth)..."
         echo "📋 Categories: 91 categories"
-        echo "👥 Workers: 1 (GitHub Actions optimized)"
+        echo "👥 Workers: 1 (stability)"
+        echo "🔒 Mode: Non-headless for debugging"
+        echo "⏱️ Wait times: Increased for stealth"
         echo "🕐 Started: $(date)"
         
         # Set display
         export DISPLAY=:99
         
-        # Start virtual display
+        # Start virtual display with larger resolution
         Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
-        sleep 5
+        sleep 10
         
-        # Run scraper
+        # Run scraper with enhanced logging
         echo "Executing: python sainsburys.py"
         timeout 6600 python sainsburys.py 2>&1 | tee sainsburys.log
         
         echo "Completed: $(date)"
     
-    - name: Check results and copy CSV
+    - name: Debug and check results
       id: results
       run: |
         cd WebScrape
         
+        echo "=== DEBUGGING SAINSBURYS SCRAPER ==="
         echo "Checking results..."
         ls -la *.csv 2>/dev/null || echo "No CSV files found"
+        
+        echo ""
+        echo "=== LOG ANALYSIS ==="
+        if [ -f "sainsburys.log" ]; then
+          echo "📋 Checking for common issues:"
+          
+          # Check for detection issues
+          if grep -q "detected" sainsburys.log; then
+            echo "⚠️ Bot detection found in logs"
+          fi
+          
+          # Check for timeout issues
+          if grep -q "timeout" sainsburys.log; then
+            echo "⚠️ Timeout issues found"
+          fi
+          
+          # Check for network issues
+          if grep -q "network" sainsburys.log; then
+            echo "⚠️ Network issues found"
+          fi
+          
+          # Show category attempts
+          echo ""
+          echo "📊 Categories attempted:"
+          grep "Starting:" sainsburys.log | head -10
+          
+          echo ""
+          echo "📊 Product counts per category:"
+          grep "No products found\|products found" sainsburys.log | head -10
+        fi
         
         if [ -f "sainsburys.csv" ]; then
           echo "✅ Found sainsburys.csv"
@@ -160,32 +222,36 @@ jobs:
           echo "success=true" >> $GITHUB_OUTPUT
           echo "product_count=$product_count" >> $GITHUB_OUTPUT
           
-          # Show sample
-          echo "📋 Sample products:"
-          head -6 sainsburys.csv | tail -5
+          # Show sample if products found
+          if [ "$product_count" -gt 0 ]; then
+            echo "📋 Sample products:"
+            head -6 sainsburys.csv | tail -5
+          fi
           
         else
           echo "❌ No sainsburys.csv found"
-          echo "📋 Last 30 lines of log:"
-          tail -30 sainsburys.log 2>/dev/null || echo "No log file"
+          echo ""
+          echo "📋 Last 50 lines of log:"
+          tail -50 sainsburys.log 2>/dev/null || echo "No log file"
           
           echo "success=false" >> $GITHUB_OUTPUT
           echo "product_count=0" >> $GITHUB_OUTPUT
         fi
     
-    - name: Upload logs and backup
+    - name: Upload comprehensive logs
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: sainsburys-logs-and-backup
+        name: sainsburys-debug-logs
         path: |
           WebScrape/sainsburys.log
           WebScrape/sainsburys.py.backup
-        retention-days: 7
+          WebScrape/sainsburys.py
+        retention-days: 14
         if-no-files-found: ignore
     
     - name: Commit changes if successful
-      if: steps.results.outputs.success == 'true'
+      if: steps.results.outputs.success == 'true' && steps.results.outputs.product_count != '0'
       run: |
         git config --global user.email "actions@github.com"
         git config --global user.name "GitHub Actions - Sainsburys"
@@ -196,8 +262,7 @@ jobs:
           git commit -m "🛒 Sainsburys price update - $(date -u '+%Y-%m-%d %H:%M UTC')
 
           Products: ${{ steps.results.outputs.product_count }}
-          Store: Sainsburys (91 categories)
-          Workers: 1 (GitHub Actions optimized)
+          Store: Sainsburys (enhanced stealth mode)
           
           Auto-updated via GitHub Actions"
           
@@ -210,17 +275,26 @@ jobs:
     - name: Summary
       if: always()
       run: |
-        echo "## 🛒 Sainsburys Scraper Summary" >> $GITHUB_STEP_SUMMARY
+        echo "## 🛒 Sainsburys Scraper Debug Summary" >> $GITHUB_STEP_SUMMARY
         echo "**Completed:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
-        if [ "${{ steps.results.outputs.success }}" == "true" ]; then
+        if [ "${{ steps.results.outputs.success }}" == "true" ] && [ "${{ steps.results.outputs.product_count }}" != "0" ]; then
           echo "### ✅ Success" >> $GITHUB_STEP_SUMMARY
           echo "- **Products:** ${{ steps.results.outputs.product_count }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Categories:** 91" >> $GITHUB_STEP_SUMMARY
-          echo "- **Workers:** 1 (optimized)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode:** Enhanced stealth (non-headless)" >> $GITHUB_STEP_SUMMARY
         else
-          echo "### ❌ Failed" >> $GITHUB_STEP_SUMMARY
-          echo "- **Error:** Check logs for details" >> $GITHUB_STEP_SUMMARY
-          echo "- **Action:** Review uploaded artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "### ❌ Failed or No Products Found" >> $GITHUB_STEP_SUMMARY
+          echo "- **Products found:** ${{ steps.results.outputs.product_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Issue:** Likely detection or website structure change" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode:** Non-headless debugging enabled" >> $GITHUB_STEP_SUMMARY
+          echo "- **Action:** Check uploaded debug logs" >> $GITHUB_STEP_SUMMARY
         fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔧 Debug Features Enabled" >> $GITHUB_STEP_SUMMARY
+        echo "- **Headless:** Disabled for debugging" >> $GITHUB_STEP_SUMMARY
+        echo "- **Enhanced stealth:** Anti-detection features" >> $GITHUB_STEP_SUMMARY
+        echo "- **Slower execution:** Longer waits between requests" >> $GITHUB_STEP_SUMMARY
+        echo "- **Limited pages:** 2 pages per category for testing" >> $GITHUB_STEP_SUMMARY
+        echo "- **Comprehensive logging:** Full debug logs uploaded" >> $GITHUB_STEP_SUMMARY
