@@ -95,32 +95,38 @@ def main():
     print("🔧 Chrome Version Resolver")
     print("=" * 40)
     
-    print("Initial version test:")
-    initial_versions = test_chrome_versions()
-    
-    # Check for inconsistencies
-    unique_versions = set(initial_versions.values())
-    if len(unique_versions) > 1:
-        print(f"\n⚠️  Found {len(unique_versions)} different versions:")
-        for version in unique_versions:
-            print(f"   - {version}")
+    try:
+        print("Initial version test:")
+        initial_versions = test_chrome_versions()
         
-        print("\n🔄 Attempting to resolve inconsistency...")
-        force_chrome_refresh()
-        
-        print("\nPost-refresh version test:")
-        post_versions = test_chrome_versions()
-        
-        post_unique = set(post_versions.values())
-        if len(post_unique) == 1:
-            print(f"✅ Version consistency achieved: {list(post_unique)[0]}")
+        # Check for inconsistencies
+        unique_versions = set(initial_versions.values())
+        if len(unique_versions) > 1:
+            print(f"\n⚠️  Found {len(unique_versions)} different versions:")
+            for version in unique_versions:
+                print(f"   - {version}")
+            
+            print("\n🔄 Attempting to resolve inconsistency...")
+            force_chrome_refresh()
+            
+            print("\nPost-refresh version test:")
+            post_versions = test_chrome_versions()
+            
+            post_unique = set(post_versions.values())
+            if len(post_unique) == 1:
+                print(f"✅ Version consistency achieved: {list(post_unique)[0]}")
+            else:
+                print(f"⚠️  Still {len(post_unique)} different versions after refresh")
         else:
-            print(f"⚠️  Still {len(post_unique)} different versions after refresh")
-    else:
-        print(f"✅ All methods report consistent version: {list(unique_versions)[0]}")
-    
-    print("\n" + "=" * 40)
-    return 0
+            print(f"✅ All methods report consistent version: {list(unique_versions)[0]}")
+        
+        print("\n" + "=" * 40)
+        return 0
+        
+    except Exception as e:
+        print(f"❌ Chrome version resolver error: {e}")
+        print("This is not critical - continuing with scraper...")
+        return 0  # Don't fail the workflow
 
 if __name__ == "__main__":
     exit(main())
