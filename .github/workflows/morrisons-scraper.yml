@@ -25,7 +25,7 @@ jobs:
       with:
         python-version: '3.11'
     
-    - name: Install system dependencies (robust)
+    - name: Install system dependencies
       run: |
         sudo apt-get clean
         sudo apt-get update --fix-missing
@@ -68,43 +68,20 @@ jobs:
         cd WebScrape
         pip install --upgrade pip
         pip install -r requirements.txt
+        pip install pandas
         echo "Installed packages:"
-        pip list | grep -E "(selenium|beautifulsoup|pandas|undetected|lxml|requests)"
-    
-    - name: Simple Morrisons optimization
-      run: |
-        cd WebScrape
-        echo "Checking Morrisons scraper..."
-        
-        # Simple sed-based optimization (safer than Python script)
-        if [ -f "morrisons.py" ]; then
-          # Backup original
-          cp morrisons.py morrisons.py.backup
-          
-          # Reduce workers to 2 for GitHub Actions
-          sed -i 's/max_workers=[0-9]*/max_workers=2/g' morrisons.py
-          
-          # Reduce max_scrolls slightly
-          sed -i 's/max_scrolls=[0-9]*/max_scrolls=30/g' morrisons.py
-          
-          echo "✅ Morrisons scraper optimized:"
-          echo "- Set max_workers=2"
-          echo "- Set max_scrolls=30"
-          echo "- Keeping all categories"
-        else
-          echo "❌ morrisons.py not found"
-          exit 1
-        fi
+        pip list | grep -E "(selenium|pandas|beautifulsoup|undetected|lxml|requests)"
     
     - name: Create public directory
       run: mkdir -p app/public
     
-    - name: Run Morrisons scraper
+    - name: Run Morrisons scraper (no modifications)
       timeout-minutes: 55
       run: |
         cd WebScrape
         echo "🛒 Starting Morrisons scraper..."
         echo "Time: $(date)"
+        echo "Using original scraper without modifications"
         
         # Set display for virtual framebuffer
         export DISPLAY=:99
@@ -159,21 +136,19 @@ jobs:
           echo "📋 Directory contents:"
           ls -la
           echo ""
-          echo "📋 Last 20 lines of log:"
-          tail -20 morrisons.log 2>/dev/null || echo "No log file"
+          echo "📋 Last 30 lines of log:"
+          tail -30 morrisons.log 2>/dev/null || echo "No log file"
           
           echo "success=false" >> $GITHUB_OUTPUT
           echo "product_count=0" >> $GITHUB_OUTPUT
         fi
     
-    - name: Upload logs and backup
+    - name: Upload logs
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: morrisons-logs-and-backup
-        path: |
-          WebScrape/morrisons.log
-          WebScrape/morrisons.py.backup
+        name: morrisons-logs
+        path: WebScrape/morrisons.log
         retention-days: 7
         if-no-files-found: ignore
     
@@ -192,7 +167,7 @@ jobs:
           git commit -m "🛒 Morrisons price update - $(date -u '+%Y-%m-%d %H:%M UTC')
 
           Products: ${{ steps.results.outputs.product_count }}
-          Store: Morrisons (all categories)
+          Store: Morrisons (all 11 categories)
           
           Auto-updated via GitHub Actions"
           
