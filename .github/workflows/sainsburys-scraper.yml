@@ -70,70 +70,43 @@ jobs:
         cd WebScrape
         pip install --upgrade pip
         pip install -r requirements.txt
-        
-        # Install latest undetected-chromedriver
         pip install undetected-chromedriver --upgrade
         pip install pandas
         
         echo "Installed packages:"
         pip list | grep -E "(selenium|pandas|beautifulsoup|undetected|lxml|requests)"
     
-    - name: Fix Sainsburys for GitHub Actions (corrected)
+    - name: Simple Sainsburys optimization (sed approach)
       run: |
         cd WebScrape
-        echo "Optimizing Sainsburys scraper for GitHub Actions..."
+        echo "Optimizing Sainsburys scraper with simple sed commands..."
         
         # Backup original
         cp sainsburys.py sainsburys.py.backup
         
-        # Create a fixed version with proper syntax
-        cat > fix_sainsburys.py << 'EOF'
-        import re
-        
-        with open('sainsburys.py', 'r') as f:
-            content = f.read()
-        
-        print("Applying GitHub Actions fixes...")
-        
         # Add headless mode if not present
-        if '--headless' not in content:
-            content = re.sub(
-                r'(options\.add_argument\(\'--disable-images\'\))',
-                r'options.add_argument(\'--headless\')\n    \1',
-                content
-            )
-            print("✅ Added headless mode")
+        if ! grep -q "headless" sainsburys.py; then
+          sed -i '/options\.add_argument('\''--disable-images'\'')/i\    options.add_argument('\''--headless'\'')' sainsburys.py
+          echo "✅ Added headless mode"
+        fi
         
-        # Add stability options one by one (safer approach)
-        stability_options = [
-            '--no-sandbox',
-            '--disable-dev-shm-usage', 
-            '--disable-gpu',
-            '--disable-extensions',
-            '--disable-plugins'
-        ]
+        # Add no-sandbox if not present
+        if ! grep -q "no-sandbox" sainsburys.py; then
+          sed -i '/options\.add_argument('\''--disable-images'\'')/a\    options.add_argument('\''--no-sandbox'\'')' sainsburys.py
+          echo "✅ Added --no-sandbox"
+        fi
         
-        for option in stability_options:
-            if option not in content:
-                content = re.sub(
-                    r'(options\.add_argument\(\'--disable-images\'\))',
-                    rf'\1\n    options.add_argument(\'{option}\')',
-                    content
-                )
-                print(f"✅ Added {option}")
+        # Add disable-dev-shm-usage if not present
+        if ! grep -q "disable-dev-shm-usage" sainsburys.py; then
+          sed -i '/options\.add_argument('\''--disable-images'\'')/a\    options.add_argument('\''--disable-dev-shm-usage'\'')' sainsburys.py
+          echo "✅ Added --disable-dev-shm-usage"
+        fi
         
-        # Reduce workers for GitHub Actions
-        content = re.sub(r'max_workers=\d+', 'max_workers=1', content)
-        print("✅ Set max_workers=1 for stability")
+        # Reduce workers to 1
+        sed -i 's/max_workers=[0-9]*/max_workers=1/g' sainsburys.py
+        echo "✅ Set max_workers=1"
         
-        # Write the fixed file
-        with open('sainsburys.py', 'w') as f:
-            f.write(content)
-        
-        print("✅ Sainsburys scraper fixed for GitHub Actions")
-        EOF
-        
-        python fix_sainsburys.py
+        echo "✅ Sainsburys scraper optimized for GitHub Actions"
     
     - name: Create public directory
       run: mkdir -p app/public
