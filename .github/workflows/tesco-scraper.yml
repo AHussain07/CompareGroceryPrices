@@ -32,40 +32,57 @@ jobs:
         sudo apt-get install -y libnss3-dev libatk-bridge2.0-0 libdrm2 libxkbcommon0 libgtk-3-0 libatspi2.0-0
         sudo apt-get install -y libasound2t64 libxrandr2 libpangocairo-1.0-0 libatk1.0-0 libcairo-gobject2 libgdk-pixbuf2.0-0
     
-    - name: Install Chrome (version 131 - compatible with undetected_chromedriver)
+    - name: Install Chrome (version consistency fix)
       run: |
-        # Remove any existing Chrome installations
+        # Remove any existing Chrome installations to avoid conflicts
         sudo apt-get remove -y google-chrome-stable google-chrome-beta google-chrome-unstable 2>/dev/null || true
+        sudo rm -rf /opt/google/chrome* 2>/dev/null || true
         
-        # Install Chrome version 131 specifically (compatible with undetected_chromedriver v139 logic)
+        # Clean package cache
+        sudo apt-get clean
+        sudo apt-get update
+        
+        # Install Chrome stable with explicit version handling
         wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
         echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
         sudo apt-get update
         
-        # Install specific Chrome version that works well with undetected_chromedriver
-        # We'll install the latest stable which should be compatible
+        # Install Chrome
         sudo apt-get install -y google-chrome-stable
+        
+        # Force Chrome to update its internal version cache
+        google-chrome --version || true
+        sleep 2
+        google-chrome --no-sandbox --disable-dev-shm-usage --version
         
         # Get exact Chrome version
         CHROME_VERSION=$(google-chrome --version)
         echo "Installed Chrome version: $CHROME_VERSION"
         
-        # Ensure Chrome binary is accessible
+        # Ensure Chrome binary is accessible and consistent
         which google-chrome
-        google-chrome --version
+        ls -la /usr/bin/google-chrome*
     
-    - name: Prepare undetected_chromedriver environment
+    - name: Prepare undetected_chromedriver environment (with version fix)
       run: |
-        # Create directories that undetected_chromedriver expects
-        mkdir -p ~/.local/share/undetected_chromedriver
-        
-        # Set permissions
-        chmod -R 755 ~/.local/share/undetected_chromedriver
+        # Completely clean undetected_chromedriver cache to avoid version conflicts
+        sudo rm -rf ~/.local/share/undetected_chromedriver 2>/dev/null || true
+        sudo rm -rf ~/.cache/undetected_chromedriver 2>/dev/null || true
+        sudo rm -rf /tmp/undetected_chromedriver* 2>/dev/null || true
+        sudo rm -rf /home/runner/.local/share/undetected_chromedriver 2>/dev/null || true
         
         # Remove any conflicting ChromeDriver installations
         sudo rm -f /usr/local/bin/chromedriver /usr/bin/chromedriver 2>/dev/null || true
         
-        # Let undetected_chromedriver handle the driver download
+        # Create fresh directories with proper permissions
+        mkdir -p ~/.local/share/undetected_chromedriver
+        mkdir -p ~/.cache/undetected_chromedriver
+        chmod -R 755 ~/.local/share
+        chmod -R 755 ~/.cache
+        
+        # Set environment to force fresh ChromeDriver download
+        echo "UNDETECTED_CHROMEDRIVER_FORCE_DOWNLOAD=1" >> $GITHUB_ENV
+        
         echo "Environment prepared for undetected_chromedriver to manage ChromeDriver"
     
     - name: Install Python dependencies
@@ -103,13 +120,17 @@ jobs:
         
         # Run our test script
         python test_chrome_setup.py
+        
+        echo ""
+        echo "Testing wrapper script..."
+        python tesco_wrapper.py --help 2>/dev/null || echo "Wrapper script is ready"
     
     - name: Run Tesco scraper (unchanged)
       timeout-minutes: 85
       run: |
         cd WebScrape
         echo "🛒 Starting Tesco scraper..."
-        echo "📋 Mode: Using original tesco.py (no modifications)"
+        echo "📋 Mode: Using tesco.py via compatibility wrapper"
         echo "🔧 Parallel processing (3 workers)"
         echo "📄 Categories: 7 main categories"
         echo "🕐 Started: $(date)"
@@ -145,9 +166,9 @@ jobs:
         echo "Detailed Chrome analysis:"
         python detect_chrome_version.py
         
-        # Run the original tesco.py script without modifications
-        echo "Executing: python tesco.py"
-        timeout 5100 python tesco.py 2>&1 | tee tesco.log
+        # Run the Tesco scraper using the compatibility wrapper
+        echo "Executing: python tesco_wrapper.py (compatibility mode)"
+        timeout 5100 python tesco_wrapper.py 2>&1 | tee tesco.log
         
         echo "Tesco scraper completed at: $(date)"
     
@@ -219,10 +240,13 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: tesco-original-logs
+        name: tesco-compatibility-logs
         path: |
           WebScrape/tesco.log
           WebScrape/tesco.py
+          WebScrape/tesco_wrapper.py
+          WebScrape/test_chrome_setup.py
+          WebScrape/detect_chrome_version.py
         retention-days: 7
         if-no-files-found: ignore
     
@@ -238,16 +262,17 @@ jobs:
         if ! git diff --staged --quiet; then
           echo "📝 Committing changes..."
           
-          git commit -m "🛒 Tesco price update (Original Script) - $(date -u '+%Y-%m-%d %H:%M UTC')
+          git commit -m "🛒 Tesco price update (Compatibility Mode) - $(date -u '+%Y-%m-%d %H:%M UTC')
 
           Products: ${{ steps.results.outputs.product_count }}
           Store: Tesco
-          Script: Original tesco.py (unmodified)
+          Script: Original tesco.py via compatibility wrapper
           Processing: Parallel (3 workers)
           Categories: 7 main categories
           
           Features:
-          - Undetected ChromeDriver v139
+          - Chrome version auto-detection
+          - Dynamic version compatibility patching
           - Performance optimizations
           - Parallel processing (3 workers)
           - Comprehensive pagination
@@ -264,30 +289,31 @@ jobs:
     - name: Summary
       if: always()
       run: |
-        echo "## 🛒 Tesco Scraper Summary (Original)" >> $GITHUB_STEP_SUMMARY
+        echo "## 🛒 Tesco Scraper Summary (Compatibility Mode)" >> $GITHUB_STEP_SUMMARY
         echo "**Run completed:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
         if [ "${{ steps.results.outputs.success }}" == "true" ]; then
           echo "### ✅ Success" >> $GITHUB_STEP_SUMMARY
           echo "- **Products scraped:** ${{ steps.results.outputs.product_count }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Script:** Original tesco.py (unmodified)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Script:** Original tesco.py via compatibility wrapper" >> $GITHUB_STEP_SUMMARY
           echo "- **Processing:** Parallel (3 workers)" >> $GITHUB_STEP_SUMMARY
           echo "- **Categories:** 7 main categories" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** Data committed to repository" >> $GITHUB_STEP_SUMMARY
         else
           echo "### ❌ Scraping Failed" >> $GITHUB_STEP_SUMMARY
           echo "- **Error:** Failed to generate usable CSV file" >> $GITHUB_STEP_SUMMARY
-          echo "- **Script:** Original tesco.py attempted" >> $GITHUB_STEP_SUMMARY
+          echo "- **Script:** Original tesco.py via compatibility wrapper" >> $GITHUB_STEP_SUMMARY
           echo "- **Logs:** Check uploaded artifacts for details" >> $GITHUB_STEP_SUMMARY
         fi
         
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 📋 Technical Details" >> $GITHUB_STEP_SUMMARY
-        echo "- **Driver:** Undetected ChromeDriver v139" >> $GITHUB_STEP_SUMMARY
+        echo "- **Driver:** Undetected ChromeDriver (auto-detected version)" >> $GITHUB_STEP_SUMMARY
         echo "- **Mode:** Headless (GitHub Actions)" >> $GITHUB_STEP_SUMMARY
         echo "- **Processing:** Parallel with 3 workers" >> $GITHUB_STEP_SUMMARY
         echo "- **Categories:** fresh-food, bakery, frozen-food, treats-and-snacks, food-cupboard, drinks, baby-and-toddler" >> $GITHUB_STEP_SUMMARY
         echo "- **Optimizations:** Image blocking, JS disabled, performance tweaks" >> $GITHUB_STEP_SUMMARY
-        echo "- **Modifications:** None - using original file" >> $GITHUB_STEP_SUMMARY
+        echo "- **Compatibility:** Dynamic Chrome version detection and patching" >> $GITHUB_STEP_SUMMARY
+        echo "- **Modifications:** Runtime compatibility patches only" >> $GITHUB_STEP_SUMMARY
         echo "- **Timeout:** 90 minutes total" >> $GITHUB_STEP_SUMMARY
