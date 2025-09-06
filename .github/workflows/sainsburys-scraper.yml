@@ -33,100 +33,137 @@ jobs:
         sudo apt-get install -y --no-install-recommends libnss3-dev libatk-bridge2.0-0 libdrm2 libxkbcommon0 libgtk-3-0 libatspi2.0-0
         sudo apt-get install -y libasound2t64 libxrandr2 libpangocairo-1.0-0 libatk1.0-0 libcairo-gobject2 libgdk-pixbuf2.0-0
     
-    - name: Install Chrome
+    - name: Install Chrome (stable version)
       run: |
         wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
         echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
         sudo apt-get update
         sudo apt-get install -y google-chrome-stable
-        google-chrome --version
+        
+        # Get exact Chrome version
+        CHROME_VERSION=$(google-chrome --version)
+        echo "Installed Chrome version: $CHROME_VERSION"
     
-    - name: Install ChromeDriver
+    - name: Install matching ChromeDriver
       run: |
-        CHROME_VERSION=$(google-chrome --version | sed 's/Google Chrome //' | cut -d'.' -f1)
-        echo "Chrome version: $CHROME_VERSION"
+        # Get Chrome major version
+        CHROME_MAJOR=$(google-chrome --version | sed 's/Google Chrome //' | cut -d'.' -f1)
+        echo "Chrome major version: $CHROME_MAJOR"
         
-        if [ "$CHROME_VERSION" -ge "115" ]; then
-          echo "Using new ChromeDriver API for undetected-chromedriver"
-          LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE")
-          echo "ChromeDriver version: $LATEST_VERSION"
-          wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$LATEST_VERSION/linux64/chromedriver-linux64.zip"
-          sudo unzip /tmp/chromedriver.zip -d /tmp/
-          sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
-        else
-          echo "Using legacy ChromeDriver API"
-          DRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
-          echo "ChromeDriver version: $DRIVER_VERSION"
-          wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${DRIVER_VERSION}/chromedriver_linux64.zip"
-          sudo unzip /tmp/chromedriver.zip -d /usr/local/bin/
-        fi
+        # Always use the Chrome for Testing API for newer versions
+        echo "Getting ChromeDriver for Chrome $CHROME_MAJOR"
+        LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE")
+        echo "Using ChromeDriver version: $LATEST_VERSION"
         
+        # Download and install ChromeDriver
+        wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$LATEST_VERSION/linux64/chromedriver-linux64.zip"
+        sudo unzip /tmp/chromedriver.zip -d /tmp/
+        sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
         sudo chmod +x /usr/local/bin/chromedriver
+        
+        # Verify installation
         chromedriver --version
+        echo "ChromeDriver installed successfully"
     
     - name: Install Python dependencies
       run: |
         cd WebScrape
         pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pandas undetected-chromedriver
+        
+        # Install latest undetected-chromedriver
+        pip install undetected-chromedriver --upgrade
+        pip install pandas
+        
         echo "Installed packages:"
         pip list | grep -E "(selenium|pandas|beautifulsoup|undetected|lxml|requests)"
     
-    - name: Minimal Sainsburys optimization (headless only)
+    - name: Fix Sainsburys for GitHub Actions
       run: |
         cd WebScrape
-        echo "Adding headless mode to Sainsburys scraper..."
+        echo "Optimizing Sainsburys scraper for GitHub Actions..."
         
         # Backup original
         cp sainsburys.py sainsburys.py.backup
         
-        # Only add headless mode, keep everything else as-is
-        if ! grep -q "headless" sainsburys.py; then
-          sed -i '/options\.add_argument('\''--disable-images'\'')/i\    options.add_argument('\''--headless'\'')' sainsburys.py
-          echo "✅ Added headless mode"
-        else
-          echo "ℹ️ Headless mode already enabled"
-        fi
+        # Create a fixed version
+        cat > fix_sainsburys.py << 'EOF'
+        import re
         
-        echo "✅ Sainsburys optimized for GitHub Actions:"
-        echo "- Added headless mode only"
-        echo "- Keeping original max_workers=2"
-        echo "- Keeping all 91 categories"
-        echo "- No other modifications"
+        with open('sainsburys.py', 'r') as f:
+            content = f.read()
+        
+        print("Applying GitHub Actions fixes...")
+        
+        # Add headless mode if not present
+        if '--headless' not in content:
+            content = re.sub(
+                r'(options\.add_argument\(\'--disable-images\'\))',
+                r'options.add_argument(\'--headless\')\n    \1',
+                content
+            )
+            print("✅ Added headless mode")
+        
+        # Add additional stability options for GitHub Actions
+        stability_options = """
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--disable-extensions')
+        options.add_argument('--disable-plugins')"""
+        
+        if '--no-sandbox' not in content:
+            content = re.sub(
+                r'(options\.add_argument\(\'--disable-images\'\))',
+                r'\1' + stability_options,
+                content
+            )
+            print("✅ Added stability options")
+        
+        # Reduce workers for GitHub Actions
+        content = re.sub(r'max_workers=\d+', 'max_workers=1', content)
+        print("✅ Set max_workers=1 for stability")
+        
+        # Write the fixed file
+        with open('sainsburys.py', 'w') as f:
+            f.write(content)
+        
+        print("✅ Sainsburys scraper fixed for GitHub Actions")
+        EOF
+        
+        python fix_sainsburys.py
     
     - name: Create public directory
       run: mkdir -p app/public
     
-    - name: Run Sainsburys scraper (original threading)
+    - name: Run Sainsburys scraper
       timeout-minutes: 115
       run: |
         cd WebScrape
         echo "🛒 Starting Sainsburys scraper..."
-        echo "📋 Categories to scrape: 91 categories"
-        echo "👥 Threading: Original max_workers=2"
-        echo "🕐 Estimated time: 90-110 minutes"
-        echo "Time started: $(date)"
+        echo "📋 Categories: 91 categories"
+        echo "👥 Workers: 1 (GitHub Actions optimized)"
+        echo "🕐 Started: $(date)"
         
-        # Set display for virtual framebuffer
+        # Set display
         export DISPLAY=:99
         
-        # Start virtual display with larger screen
+        # Start virtual display
         Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
         sleep 5
         
-        # Run scraper with timeout and detailed logging
-        echo "Running python sainsburys.py..."
+        # Run scraper
+        echo "Executing: python sainsburys.py"
         timeout 6600 python sainsburys.py 2>&1 | tee sainsburys.log
         
-        echo "Sainsburys scraper completed at: $(date)"
+        echo "Completed: $(date)"
     
     - name: Check results and copy CSV
       id: results
       run: |
         cd WebScrape
         
-        echo "Checking for output files..."
+        echo "Checking results..."
         ls -la *.csv 2>/dev/null || echo "No CSV files found"
         
         if [ -f "sainsburys.csv" ]; then
@@ -134,9 +171,8 @@ jobs:
           
           # Copy to public directory
           cp sainsburys.csv ../app/public/
-          echo "✅ Copied to app/public/"
           
-          # Get detailed stats
+          # Get stats
           total_lines=$(wc -l < sainsburys.csv)
           product_count=$((total_lines - 1))
           file_size=$(ls -lh sainsburys.csv | awk '{print $5}')
@@ -144,30 +180,19 @@ jobs:
           echo "📊 Results:"
           echo "- Products: $product_count"
           echo "- File size: $file_size"
-          echo "- Total lines: $total_lines"
           
           # Set outputs
           echo "success=true" >> $GITHUB_OUTPUT
           echo "product_count=$product_count" >> $GITHUB_OUTPUT
           
-          # Show sample products
-          echo ""
-          echo "📋 Sample products (first 5):"
+          # Show sample
+          echo "📋 Sample products:"
           head -6 sainsburys.csv | tail -5
-          
-          # Show category breakdown if possible
-          echo ""
-          echo "📊 Top 10 categories by product count:"
-          tail -n +2 sainsburys.csv | cut -d',' -f1 | sort | uniq -c | sort -nr | head -10
           
         else
           echo "❌ No sainsburys.csv found"
-          echo ""
-          echo "📋 Directory contents:"
-          ls -la
-          echo ""
-          echo "📋 Last 50 lines of log:"
-          tail -50 sainsburys.log 2>/dev/null || echo "No log file"
+          echo "📋 Last 30 lines of log:"
+          tail -30 sainsburys.log 2>/dev/null || echo "No log file"
           
           echo "success=false" >> $GITHUB_OUTPUT
           echo "product_count=0" >> $GITHUB_OUTPUT
@@ -190,26 +215,19 @@ jobs:
         git config --global user.email "actions@github.com"
         git config --global user.name "GitHub Actions - Sainsburys"
         
-        # Add CSV file
         git add -f app/public/sainsburys.csv
         
         if ! git diff --staged --quiet; then
-          echo "📝 Committing changes..."
-          
           git commit -m "🛒 Sainsburys price update - $(date -u '+%Y-%m-%d %H:%M UTC')
 
           Products: ${{ steps.results.outputs.product_count }}
-          Store: Sainsburys (all 91 categories)
-          Workers: 2 (original threading)
-          
-          Categories: Frozen, Drinks, Occasions, Food Cupboard, 
-                     Dietary & World Foods, Bakery, Dairy & Chilled,
-                     Fruit & Vegetables, Meat & Fish
+          Store: Sainsburys (91 categories)
+          Workers: 1 (GitHub Actions optimized)
           
           Auto-updated via GitHub Actions"
           
           git push origin HEAD:${{ github.ref_name }}
-          echo "✅ Changes pushed successfully"
+          echo "✅ Changes pushed"
         else
           echo "ℹ️ No changes to commit"
         fi
@@ -218,27 +236,16 @@ jobs:
       if: always()
       run: |
         echo "## 🛒 Sainsburys Scraper Summary" >> $GITHUB_STEP_SUMMARY
-        echo "**Run completed:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+        echo "**Completed:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
         if [ "${{ steps.results.outputs.success }}" == "true" ]; then
           echo "### ✅ Success" >> $GITHUB_STEP_SUMMARY
-          echo "- **Products scraped:** ${{ steps.results.outputs.product_count }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Categories:** All 91 categories" >> $GITHUB_STEP_SUMMARY
-          echo "- **Threading:** Original max_workers=2" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status:** Data committed to repository" >> $GITHUB_STEP_SUMMARY
+          echo "- **Products:** ${{ steps.results.outputs.product_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Categories:** 91" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workers:** 1 (optimized)" >> $GITHUB_STEP_SUMMARY
         else
-          echo "### ❌ Scraping Failed" >> $GITHUB_STEP_SUMMARY
-          echo "- **Error:** Failed to generate CSV file" >> $GITHUB_STEP_SUMMARY
-          echo "- **Logs:** Check uploaded artifacts for details" >> $GITHUB_STEP_SUMMARY
-          echo "- **Threading:** Used original max_workers=2" >> $GITHUB_STEP_SUMMARY
-          echo "- **Retry:** Try single worker if this fails" >> $GITHUB_STEP_SUMMARY
+          echo "### ❌ Failed" >> $GITHUB_STEP_SUMMARY
+          echo "- **Error:** Check logs for details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Action:** Review uploaded artifacts" >> $GITHUB_STEP_SUMMARY
         fi
-        
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 📋 Technical Details" >> $GITHUB_STEP_SUMMARY
-        echo "- **Driver:** Undetected ChromeDriver" >> $GITHUB_STEP_SUMMARY
-        echo "- **Mode:** Headless (added)" >> $GITHUB_STEP_SUMMARY
-        echo "- **Workers:** 2 (original setting)" >> $GITHUB_STEP_SUMMARY
-        echo "- **Timeout:** 2 hours" >> $GITHUB_STEP_SUMMARY
-        echo "- **Categories:** All 91 preserved" >> $GITHUB_STEP_SUMMARY
