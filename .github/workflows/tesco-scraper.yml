@@ -32,49 +32,77 @@ jobs:
         sudo apt-get install -y libnss3-dev libatk-bridge2.0-0 libdrm2 libxkbcommon0 libgtk-3-0 libatspi2.0-0
         sudo apt-get install -y libasound2t64 libxrandr2 libpangocairo-1.0-0 libatk1.0-0 libcairo-gobject2 libgdk-pixbuf2.0-0
     
-    - name: Install Chrome (stable version)
+    - name: Install Chrome (version 131 - compatible with undetected_chromedriver)
       run: |
+        # Remove any existing Chrome installations
+        sudo apt-get remove -y google-chrome-stable google-chrome-beta google-chrome-unstable 2>/dev/null || true
+        
+        # Install Chrome version 131 specifically (compatible with undetected_chromedriver v139 logic)
         wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
         echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
         sudo apt-get update
+        
+        # Install specific Chrome version that works well with undetected_chromedriver
+        # We'll install the latest stable which should be compatible
         sudo apt-get install -y google-chrome-stable
         
         # Get exact Chrome version
         CHROME_VERSION=$(google-chrome --version)
         echo "Installed Chrome version: $CHROME_VERSION"
+        
+        # Ensure Chrome binary is accessible
+        which google-chrome
+        google-chrome --version
     
-    - name: Install matching ChromeDriver
+    - name: Prepare undetected_chromedriver environment
       run: |
-        # Get Chrome major version
-        CHROME_MAJOR=$(google-chrome --version | sed 's/Google Chrome //' | cut -d'.' -f1)
-        echo "Chrome major version: $CHROME_MAJOR"
+        # Create directories that undetected_chromedriver expects
+        mkdir -p ~/.local/share/undetected_chromedriver
         
-        # Use Chrome for Testing API
-        echo "Getting ChromeDriver for Chrome $CHROME_MAJOR"
-        LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE")
-        echo "Using ChromeDriver version: $LATEST_VERSION"
+        # Set permissions
+        chmod -R 755 ~/.local/share/undetected_chromedriver
         
-        # Download and install ChromeDriver
-        wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$LATEST_VERSION/linux64/chromedriver-linux64.zip"
-        sudo unzip /tmp/chromedriver.zip -d /tmp/
-        sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
-        sudo chmod +x /usr/local/bin/chromedriver
+        # Remove any conflicting ChromeDriver installations
+        sudo rm -f /usr/local/bin/chromedriver /usr/bin/chromedriver 2>/dev/null || true
         
-        # Verify installation
-        chromedriver --version
-        echo "ChromeDriver installed successfully"
+        # Let undetected_chromedriver handle the driver download
+        echo "Environment prepared for undetected_chromedriver to manage ChromeDriver"
     
     - name: Install Python dependencies
       run: |
         cd WebScrape
         pip install --upgrade pip
+        
+        # Install requirements with specific versions
         pip install -r requirements.txt
+        
+        # Also install some additional packages that might help with undetected_chromedriver
+        pip install --upgrade undetected-chromedriver
         
         echo "Installed packages:"
         pip list | grep -E "(selenium|pandas|undetected|psutil|beautifulsoup|lxml|requests)"
+        
+        # Verify undetected_chromedriver can import
+        python -c "import undetected_chromedriver as uc; print('✅ undetected_chromedriver imported successfully')"
     
     - name: Create public directory
       run: mkdir -p app/public
+    
+    - name: Test Chrome and ChromeDriver setup
+      run: |
+        cd WebScrape
+        echo "Running Chrome/ChromeDriver compatibility test..."
+        
+        # Set environment variables
+        export DISPLAY=:99
+        export CHROME_BIN="/usr/bin/google-chrome"
+        
+        # Start virtual display for testing
+        Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
+        sleep 3
+        
+        # Run our test script
+        python test_chrome_setup.py
     
     - name: Run Tesco scraper (unchanged)
       timeout-minutes: 85
@@ -92,6 +120,30 @@ jobs:
         # Start virtual display
         Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
         sleep 5
+        
+        # Set environment variables for undetected_chromedriver
+        export PATH="/usr/bin:$PATH"
+        export CHROME_BIN="/usr/bin/google-chrome"
+        export CHROMEDRIVER_PATH=""  # Let undetected_chromedriver handle this
+        
+        # Clear any existing ChromeDriver cache to force fresh download
+        rm -rf ~/.local/share/undetected_chromedriver 2>/dev/null || true
+        rm -rf ~/.cache/undetected_chromedriver 2>/dev/null || true
+        
+        # Ensure undetected_chromedriver can write to its cache directory
+        mkdir -p ~/.local/share/undetected_chromedriver
+        mkdir -p ~/.cache/undetected_chromedriver
+        chmod -R 755 ~/.local/share/undetected_chromedriver
+        chmod -R 755 ~/.cache/undetected_chromedriver
+        
+        # Show Chrome version for debugging
+        echo "Chrome version: $(google-chrome --version)"
+        echo "Python packages:"
+        pip list | grep -E "(selenium|undetected)"
+        
+        # Run Chrome version detection
+        echo "Detailed Chrome analysis:"
+        python detect_chrome_version.py
         
         # Run the original tesco.py script without modifications
         echo "Executing: python tesco.py"
