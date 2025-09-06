@@ -1,0 +1,256 @@
+name: ASDA Price Scraper
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 12 * * 1'  # Mondays at 12 PM UTC (2 hours after Sainsburys)
+
+permissions:
+  contents: write
+
+jobs:
+  scrape-asda:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90  # 1.5 hours for parallel processing
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get clean
+        sudo apt-get update --fix-missing
+        sudo apt-get install -y --fix-broken wget curl unzip xvfb
+        sudo apt-get install -y --no-install-recommends libnss3-dev libatk-bridge2.0-0 libdrm2 libxkbcommon0 libgtk-3-0 libatspi2.0-0
+        sudo apt-get install -y libasound2t64 libxrandr2 libpangocairo-1.0-0 libatk1.0-0 libcairo-gobject2 libgdk-pixbuf2.0-0
+    
+    - name: Install Chrome (stable version)
+      run: |
+        wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+        echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+        sudo apt-get update
+        sudo apt-get install -y google-chrome-stable
+        
+        # Get exact Chrome version
+        CHROME_VERSION=$(google-chrome --version)
+        echo "Installed Chrome version: $CHROME_VERSION"
+    
+    - name: Install matching ChromeDriver
+      run: |
+        # Get Chrome major version
+        CHROME_MAJOR=$(google-chrome --version | sed 's/Google Chrome //' | cut -d'.' -f1)
+        echo "Chrome major version: $CHROME_MAJOR"
+        
+        # Use Chrome for Testing API
+        echo "Getting ChromeDriver for Chrome $CHROME_MAJOR"
+        LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE")
+        echo "Using ChromeDriver version: $LATEST_VERSION"
+        
+        # Download and install ChromeDriver
+        wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$LATEST_VERSION/linux64/chromedriver-linux64.zip"
+        sudo unzip /tmp/chromedriver.zip -d /tmp/
+        sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
+        sudo chmod +x /usr/local/bin/chromedriver
+        
+        # Verify installation
+        chromedriver --version
+        echo "ChromeDriver installed successfully"
+    
+    - name: Install Python dependencies
+      run: |
+        cd WebScrape
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pandas selenium
+        
+        echo "Installed packages:"
+        pip list | grep -E "(selenium|pandas|beautifulsoup|lxml|requests)"
+    
+    - name: Optimize ASDA scraper for GitHub Actions
+      run: |
+        cd WebScrape
+        echo "Optimizing ASDA scraper for GitHub Actions..."
+        
+        # Backup original
+        cp asda.py asda.py.backup
+        
+        # Add headless mode if not present
+        if ! grep -q "headless" asda.py; then
+          sed -i '/options\.add_argument("--disable-images")/i\    options.add_argument("--headless")' asda.py
+          echo "✅ Added headless mode"
+        fi
+        
+        # Reduce thread count for GitHub Actions stability
+        sed -i 's/max_workers=3/max_workers=2/g' asda.py
+        echo "✅ Reduced to 2 workers for stability"
+        
+        echo "✅ ASDA scraper optimized:"
+        echo "- Added headless mode"
+        echo "- Reduced to 2 parallel workers"
+        echo "- All categories enabled"
+        echo "- Full pagination scraping"
+    
+    - name: Create public directory
+      run: mkdir -p app/public
+    
+    - name: Run ASDA scraper (parallel processing)
+      timeout-minutes: 85
+      run: |
+        cd WebScrape
+        echo "🛒 Starting ASDA scraper..."
+        echo "📋 Mode: Dynamic category detection"
+        echo "👥 Workers: 2 (parallel processing)"
+        echo "📄 Pages: Full pagination per category"
+        echo "🕐 Started: $(date)"
+        
+        # Set display for virtual framebuffer
+        export DISPLAY=:99
+        
+        # Start virtual display
+        Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
+        sleep 5
+        
+        # Run scraper with timeout and logging
+        echo "Executing: python asda.py"
+        timeout 5100 python asda.py 2>&1 | tee asda.log
+        
+        echo "ASDA scraper completed at: $(date)"
+    
+    - name: Check results and copy CSV
+      id: results
+      run: |
+        cd WebScrape
+        
+        echo "Checking for output files..."
+        ls -la *.csv 2>/dev/null || echo "No CSV files found"
+        
+        if [ -f "asda.csv" ]; then
+          echo "✅ Found asda.csv"
+          
+          # Copy to public directory
+          cp asda.csv ../app/public/
+          echo "✅ Copied to app/public/"
+          
+          # Get detailed stats
+          total_lines=$(wc -l < asda.csv)
+          product_count=$((total_lines - 1))
+          file_size=$(ls -lh asda.csv | awk '{print $5}')
+          
+          echo "📊 Results:"
+          echo "- Products: $product_count"
+          echo "- File size: $file_size"
+          echo "- Total lines: $total_lines"
+          
+          # Set outputs
+          echo "success=true" >> $GITHUB_OUTPUT
+          echo "product_count=$product_count" >> $GITHUB_OUTPUT
+          
+          # Show sample products
+          echo ""
+          echo "📋 Sample products (first 5):"
+          head -6 asda.csv | tail -5
+          
+          # Show category breakdown
+          echo ""
+          echo "📊 Categories breakdown:"
+          tail -n +2 asda.csv | cut -d',' -f1 | sort | uniq -c | sort -nr | head -10
+          
+          # Show performance stats from log
+          echo ""
+          echo "📊 Performance stats:"
+          grep -E "Total products:|Total time:|Products per second:" asda.log | tail -3
+          
+        else
+          echo "❌ No asda.csv found"
+          echo ""
+          echo "📋 Directory contents:"
+          ls -la
+          echo ""
+          echo "📋 Last 50 lines of log:"
+          tail -50 asda.log 2>/dev/null || echo "No log file"
+          
+          echo "success=false" >> $GITHUB_OUTPUT
+          echo "product_count=0" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Upload logs and backup
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: asda-logs-and-backup
+        path: |
+          WebScrape/asda.log
+          WebScrape/asda.py.backup
+        retention-days: 7
+        if-no-files-found: ignore
+    
+    - name: Commit changes if successful
+      if: steps.results.outputs.success == 'true'
+      run: |
+        git config --global user.email "actions@github.com"
+        git config --global user.name "GitHub Actions - ASDA"
+        
+        # Add CSV file
+        git add -f app/public/asda.csv
+        
+        if ! git diff --staged --quiet; then
+          echo "📝 Committing changes..."
+          
+          git commit -m "🛒 ASDA price update - $(date -u '+%Y-%m-%d %H:%M UTC')
+
+          Products: ${{ steps.results.outputs.product_count }}
+          Store: ASDA (all categories)
+          Workers: 2 (parallel processing)
+          Method: Dynamic category detection
+          
+          Features:
+          - Parallel processing with 2 workers
+          - Dynamic category discovery
+          - Full pagination scraping
+          - Comprehensive product extraction
+          
+          Auto-updated via GitHub Actions"
+          
+          git push origin HEAD:${{ github.ref_name }}
+          echo "✅ Changes pushed successfully"
+        else
+          echo "ℹ️ No changes to commit"
+        fi
+    
+    - name: Summary
+      if: always()
+      run: |
+        echo "## 🛒 ASDA Scraper Summary" >> $GITHUB_STEP_SUMMARY
+        echo "**Run completed:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ steps.results.outputs.success }}" == "true" ]; then
+          echo "### ✅ Success" >> $GITHUB_STEP_SUMMARY
+          echo "- **Products scraped:** ${{ steps.results.outputs.product_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Categories:** Dynamic detection (all available)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workers:** 2 parallel threads" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** Data committed to repository" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### ❌ Scraping Failed" >> $GITHUB_STEP_SUMMARY
+          echo "- **Error:** Failed to generate CSV file" >> $GITHUB_STEP_SUMMARY
+          echo "- **Logs:** Check uploaded artifacts for details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workers:** 2 parallel threads attempted" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📋 Technical Details" >> $GITHUB_STEP_SUMMARY
+        echo "- **Driver:** Standard Selenium ChromeDriver" >> $GITHUB_STEP_SUMMARY
+        echo "- **Mode:** Headless (added for GitHub Actions)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Processing:** Parallel with 2 workers" >> $GITHUB_STEP_SUMMARY
+        echo "- **Categories:** Dynamic discovery from website" >> $GITHUB_STEP_SUMMARY
+        echo "- **Pagination:** Full scraping of all pages" >> $GITHUB_STEP_SUMMARY
+        echo "- **Timeout:** 1.5 hours total" >> $GITHUB_STEP_SUMMARY
