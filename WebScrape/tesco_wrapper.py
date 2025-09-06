@@ -33,10 +33,12 @@ def setup_chrome_environment():
     os.environ['CHROME_BIN'] = '/usr/bin/google-chrome'
     os.environ['UNDETECTED_CHROMEDRIVER_FORCE_DOWNLOAD'] = '1'
     
-    # Kill any existing Chrome processes
+    # Kill any existing Chrome processes more thoroughly
     try:
         subprocess.run(['pkill', '-f', 'chrome'], capture_output=True)
-        time.sleep(2)
+        subprocess.run(['pkill', '-f', 'Google Chrome'], capture_output=True)
+        subprocess.run(['pkill', '-f', 'chromedriver'], capture_output=True)
+        time.sleep(3)
         print("✅ Killed existing Chrome processes")
     except:
         pass
@@ -65,28 +67,44 @@ def patch_tesco_script():
     with open('tesco.py', 'r') as f:
         content = f.read()
     
-    # Create a patched version that doesn't specify version_main
+    # Create multiple patched versions for different strategies
+    patches_created = []
+    
     if 'version_main=139' in content:
         print(f"🔧 Patching Chrome version (detected: {chrome_version})")
         
+        # Strategy 1: Use detected version
         if chrome_version:
-            # Use detected version
-            patched_content = content.replace('version_main=139', f'version_main={chrome_version}')
-        else:
-            # Remove version specification entirely
-            patched_content = content.replace('version_main=139,', '')
-            patched_content = patched_content.replace(', version_main=139', '')
-            patched_content = patched_content.replace('version_main=139', '')
+            patched_content_1 = content.replace('version_main=139', f'version_main={chrome_version}')
+            with open('tesco_patched_v1.py', 'w') as f:
+                f.write(patched_content_1)
+            patches_created.append(('tesco_patched_v1.py', f'explicit version {chrome_version}'))
         
-        # Write patched version
-        with open('tesco_patched.py', 'w') as f:
-            f.write(patched_content)
+        # Strategy 2: Remove version specification entirely
+        patched_content_2 = content.replace('version_main=139,', '')
+        patched_content_2 = patched_content_2.replace(', version_main=139', '')
+        patched_content_2 = patched_content_2.replace('version_main=139', '')
+        with open('tesco_patched_v2.py', 'w') as f:
+            f.write(patched_content_2)
+        patches_created.append(('tesco_patched_v2.py', 'no version specification'))
         
-        print("✅ Created compatibility-patched version: tesco_patched.py")
-        return True
+        # Strategy 3: Force version 140 (since Chrome reports 140)
+        patched_content_3 = content.replace('version_main=139', 'version_main=140')
+        with open('tesco_patched_v3.py', 'w') as f:
+            f.write(patched_content_3)
+        patches_created.append(('tesco_patched_v3.py', 'force version 140'))
+        
+        # Strategy 4: Use None explicitly
+        patched_content_4 = content.replace('version_main=139', 'version_main=None')
+        with open('tesco_patched_v4.py', 'w') as f:
+            f.write(patched_content_4)
+        patches_created.append(('tesco_patched_v4.py', 'explicit None version'))
+        
+        print(f"✅ Created {len(patches_created)} compatibility patches")
+        return patches_created
     else:
         print("ℹ️  No version specification found to patch")
-        return False
+        return []
 
 def main():
     """Main wrapper function"""
@@ -102,30 +120,83 @@ def main():
         print(f"🔍 Detected Chrome version: {chrome_version}")
     
     # Try to patch the script for compatibility
-    patched = patch_tesco_script()
+    patches = patch_tesco_script()
     
-    # Run the appropriate version
-    if patched:
-        print("🏃 Running patched version...")
-        script_name = 'tesco_patched.py'
-    else:
-        print("🏃 Running original version...")
-        script_name = 'tesco.py'
+    # Try different strategies in order of preference
+    strategies = []
     
-    try:
-        # Execute the script
-        result = subprocess.run([sys.executable, script_name], 
-                              capture_output=False, 
-                              text=True)
-        return result.returncode
-    except Exception as e:
-        print(f"❌ Error running script: {e}")
-        return 1
-    finally:
-        # Cleanup patched file
-        if patched and os.path.exists('tesco_patched.py'):
-            os.remove('tesco_patched.py')
-            print("🧹 Cleaned up patched file")
+    # Add patched versions if available
+    for patch_file, description in patches:
+        strategies.append((patch_file, f"patched version ({description})"))
+    
+    # Add original as fallback
+    strategies.append(('tesco.py', 'original version'))
+    
+    print(f"� Will try {len(strategies)} strategies...")
+    
+    for i, (script_name, description) in enumerate(strategies, 1):
+        print(f"\n🏃 Strategy {i}/{len(strategies)}: Running {description}...")
+        
+        try:
+            # Execute the script
+            result = subprocess.run([sys.executable, script_name], 
+                                  capture_output=False, 
+                                  text=True,
+                                  timeout=5400)  # 90 minutes timeout
+            
+            if result.returncode == 0:
+                print(f"✅ Success with {description}!")
+                # Cleanup patched files on success
+                for patch_file, _ in patches:
+                    if os.path.exists(patch_file):
+                        try:
+                            os.remove(patch_file)
+                            print(f"🧹 Cleaned up {patch_file}")
+                        except:
+                            pass
+                return 0
+            else:
+                print(f"⚠️  {description} failed with exit code {result.returncode}")
+                if i < len(strategies):
+                    print("🔄 Trying next strategy...")
+                    # Clean up any running Chrome processes before next attempt
+                    try:
+                        subprocess.run(['pkill', '-f', 'chrome'], capture_output=True)
+                        time.sleep(2)
+                    except:
+                        pass
+                    continue
+                    
+        except subprocess.TimeoutExpired:
+            print(f"⏱️  {description} timed out after 90 minutes")
+            if i < len(strategies):
+                print("🔄 Trying next strategy...")
+                # Kill processes and try next
+                try:
+                    subprocess.run(['pkill', '-f', 'chrome'], capture_output=True)
+                    subprocess.run(['pkill', '-f', 'python'], capture_output=True)
+                    time.sleep(3)
+                except:
+                    pass
+                continue
+        except Exception as e:
+            print(f"❌ Error running {description}: {e}")
+            if i < len(strategies):
+                print("🔄 Trying next strategy...")
+                continue
+    
+    print("❌ All strategies failed.")
+    
+    # Cleanup patched files
+    for patch_file, _ in patches:
+        if os.path.exists(patch_file):
+            try:
+                os.remove(patch_file)
+                print(f"🧹 Cleaned up {patch_file}")
+            except:
+                pass
+    
+    return 1
 
 if __name__ == "__main__":
     exit(main())
