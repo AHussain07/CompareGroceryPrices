@@ -124,6 +124,10 @@ jobs:
         echo ""
         echo "Testing wrapper script..."
         python tesco_wrapper.py --help 2>/dev/null || echo "Wrapper script is ready"
+        
+        echo ""
+        echo "Running Chrome version resolver..."
+        python chrome_version_resolver.py
     
     - name: Run Tesco scraper (unchanged)
       timeout-minutes: 85
@@ -151,6 +155,17 @@ jobs:
         rm -rf ~/.local/share/undetected_chromedriver 2>/dev/null || true
         rm -rf ~/.cache/undetected_chromedriver 2>/dev/null || true
         
+        # Force Chrome to restart and refresh its version info
+        sudo systemctl stop google-chrome* 2>/dev/null || true
+        sleep 2
+        
+        # Test Chrome with different flags to see actual running version
+        google-chrome --no-sandbox --disable-dev-shm-usage --version
+        google-chrome --version
+        
+        echo "Chrome binary location: $(which google-chrome)"
+        ls -la /usr/bin/google-chrome*
+        
         # Ensure undetected_chromedriver can write to its cache directory
         mkdir -p ~/.local/share/undetected_chromedriver
         mkdir -p ~/.cache/undetected_chromedriver
@@ -165,6 +180,14 @@ jobs:
         # Run Chrome version detection
         echo "Detailed Chrome analysis:"
         python detect_chrome_version.py
+        
+        # Force a Chrome version refresh
+        echo "Attempting to resolve Chrome version inconsistency..."
+        timeout 10 google-chrome --headless --no-sandbox --disable-dev-shm-usage --remote-debugging-port=9222 --version &
+        sleep 2
+        pkill -f chrome || true
+        sleep 1
+        echo "Chrome version after refresh: $(google-chrome --version)"
         
         # Run the Tesco scraper using the compatibility wrapper
         echo "Executing: python tesco_wrapper.py (compatibility mode)"
@@ -247,6 +270,7 @@ jobs:
           WebScrape/tesco_wrapper.py
           WebScrape/test_chrome_setup.py
           WebScrape/detect_chrome_version.py
+          WebScrape/chrome_version_resolver.py
         retention-days: 7
         if-no-files-found: ignore
     
