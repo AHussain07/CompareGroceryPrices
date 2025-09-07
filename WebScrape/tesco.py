@@ -7,13 +7,74 @@ import pandas as pd
 import time
 import threading
 import os
+import re
+import subprocess
 
 # Thread-safe list for collecting products
 products_lock = threading.Lock()
 all_products = []
 
+def get_chrome_version():
+    """Get installed Chrome version - adapted from sainsburys.py"""
+    try:
+        # Try registry method first (Windows)
+        try:
+            result = subprocess.run([
+                'reg', 'query', 'HKEY_CURRENT_USER\\Software\\Google\\Chrome\\BLBeacon', '/v', 'version'
+            ], capture_output=True, text=True, timeout=10)
+            
+            if result.returncode == 0:
+                version_match = re.search(r'(\d+)\.(\d+)\.(\d+)\.(\d+)', result.stdout)
+                if version_match:
+                    full_version = version_match.group(0)
+                    major_version = int(version_match.group(1))
+                    print(f"Detected Chrome version: {full_version} (major: {major_version})")
+                    return major_version
+        except:
+            pass
+        
+        # Try PowerShell method (Windows)
+        try:
+            result = subprocess.run([
+                'powershell', '-command', 
+                '(Get-Item "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe").VersionInfo.ProductVersion'
+            ], capture_output=True, text=True, timeout=10)
+            
+            if result.returncode == 0:
+                version_match = re.search(r'(\d+)\.(\d+)\.(\d+)\.(\d+)', result.stdout)
+                if version_match:
+                    full_version = version_match.group(0)
+                    major_version = int(version_match.group(1))
+                    print(f"Detected Chrome version: {full_version} (major: {major_version})")
+                    return major_version
+        except:
+            pass
+        
+        # Try Linux/GitHub Actions method
+        try:
+            result = subprocess.run(['google-chrome', '--version'], 
+                                  capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                version_match = re.search(r'(\d+)', result.stdout)
+                if version_match:
+                    major_version = int(version_match.group(1))
+                    print(f"Detected Chrome version: {major_version}")
+                    return major_version
+        except:
+            pass
+        
+        print("Could not detect Chrome version - will use auto-detection")
+        return None
+        
+    except Exception as e:
+        print(f"Error detecting Chrome version: {e}")
+        return None
+
 def setup_optimized_driver():
-    """Setup Chrome driver with performance optimizations"""
+    """Setup Chrome driver with performance optimizations and dynamic version detection"""
+    # Get Chrome version
+    chrome_version = get_chrome_version()
+    
     options = uc.ChromeOptions()
     # Performance optimizations
     options.add_argument('--disable-images')  # Don't load images - major speed boost
@@ -29,9 +90,26 @@ def setup_optimized_driver():
     options.add_argument('--disable-renderer-backgrounding')
     options.add_argument('--disable-backgrounding-occluded-windows')
 
-    # Force uc to fetch a ChromeDriver matching your Chrome version (e.g., 139)
-    return uc.Chrome(version_main=139, options=options)
-
+    try:
+        # Try with detected Chrome version first
+        if chrome_version:
+            print(f"Attempting to create driver with Chrome version {chrome_version}")
+            try:
+                driver = uc.Chrome(version_main=chrome_version, options=options)
+                print("✅ Driver created successfully with detected version")
+                return driver
+            except Exception as e:
+                print(f"Failed with detected version {chrome_version}: {e}")
+        
+        # Fallback: Let undetected-chromedriver auto-detect
+        print("Attempting auto-detection fallback...")
+        driver = uc.Chrome(version_main=None, options=options)
+        print("✅ Driver created successfully with auto-detection")
+        return driver
+        
+    except Exception as e:
+        print(f"Failed to create driver: {e}")
+        return None
 
 def scrape_single_category(base_url, category_name):
     """Scrape a single category with optimizations"""
