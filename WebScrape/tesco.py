@@ -3,18 +3,15 @@ import sys
 
 chromedriver_path = os.environ.get("UCD_CHROMEDRIVER_PATH")
 if not chromedriver_path:
-    # Try common locations
     if os.name == "nt":
-        # Windows: look for chromedriver.exe in current dir
         chromedriver_path = os.path.join(os.getcwd(), "chromedriver.exe")
         if not os.path.exists(chromedriver_path):
             print("❌ chromedriver.exe not found. Please download it and set UCD_CHROMEDRIVER_PATH or place it in the script directory.")
             sys.exit(1)
     else:
-        # Linux: use default install location from workflow
-        chromedriver_path = "/usr/local/bin/chromedriver"
+        chromedriver_path = "./chromedriver"
         if not os.path.exists(chromedriver_path):
-            print("❌ chromedriver not found at /usr/local/bin/chromedriver. Set UCD_CHROMEDRIVER_PATH or check your workflow.")
+            print("❌ chromedriver not found at ./chromedriver. Set UCD_CHROMEDRIVER_PATH or check your workflow.")
             sys.exit(1)
         # Use Windows or Linux default name
         chromedriver_path = "chromedriver.exe" if os.name == "nt" else "chromedriver"
