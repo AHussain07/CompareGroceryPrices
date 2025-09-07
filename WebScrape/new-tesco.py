@@ -11,6 +11,19 @@ import pandas as pd
 import uuid
 import sys
 import platform
+import undetected_chromedriver as uc
+import threading
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# === Patch uc.Chrome destructor to prevent WinError 6 warnings ===
+uc.Chrome.__del__ = lambda self: None
+
+# Thread-safe list for collecting products
+products_lock = threading.Lock()
+all_products = []
 
 def clean_price(price_text):
     """Extract numeric price from price text"""
@@ -22,130 +35,101 @@ def clean_price(price_text):
 def get_chrome_version():
     """Get installed Chrome version (cross-platform)"""
     try:
-        if platform.system() == "Windows":
+        # Try registry method first (Windows)
+        try:
             result = subprocess.run([
                 'reg', 'query', 'HKEY_CURRENT_USER\\Software\\Google\\Chrome\\BLBeacon', '/v', 'version'
-            ], capture_output=True, text=True, timeout=5)
+            ], capture_output=True, text=True, timeout=10)
             
             if result.returncode == 0:
                 version_match = re.search(r'(\d+)\.(\d+)\.(\d+)\.(\d+)', result.stdout)
                 if version_match:
+                    full_version = version_match.group(0)
                     major_version = int(version_match.group(1))
+                    print(f"Detected Chrome version: {full_version} (major: {major_version})")
                     return major_version
-        else:  # Linux/macOS
-            result = subprocess.run(['google-chrome', '--version'], capture_output=True, text=True, timeout=5)
+        except:
+            pass
+        
+        # Try PowerShell method (Windows)
+        try:
+            result = subprocess.run([
+                'powershell', '-command', 
+                '(Get-Item "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe").VersionInfo.ProductVersion'
+            ], capture_output=True, text=True, timeout=10)
+            
             if result.returncode == 0:
                 version_match = re.search(r'(\d+)\.(\d+)\.(\d+)\.(\d+)', result.stdout)
                 if version_match:
+                    full_version = version_match.group(0)
                     major_version = int(version_match.group(1))
+                    print(f"Detected Chrome version: {full_version} (major: {major_version})")
                     return major_version
+        except:
+            pass
+        
+        # Try Linux/GitHub Actions method
+        try:
+            result = subprocess.run(['google-chrome', '--version'], 
+                                  capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                version_match = re.search(r'(\d+)', result.stdout)
+                if version_match:
+                    major_version = int(version_match.group(1))
+                    print(f"Detected Chrome version: {major_version}")
+                    return major_version
+        except:
+            pass
+        
+        print("Could not detect Chrome version - will use auto-detection")
         return None
-    except:
+        
+    except Exception as e:
+        print(f"Error detecting Chrome version: {e}")
         return None
 
-def setup_stealth_driver():
-    """Setup stealth driver with fallback options"""
-    driver = None
+def setup_optimized_driver():
+    """Setup Chrome driver with performance optimizations and dynamic version detection"""
+    # Get Chrome version
+    chrome_version = get_chrome_version()
     
-    # Try UC Chrome first
-    try:
-        import undetected_chromedriver as uc
-        
-        # Patch to prevent warnings
-        uc.Chrome.__del__ = lambda self: None
-        
-        chrome_version = get_chrome_version()
-        print(f"🔍 Detected Chrome version: {chrome_version}")
-        
+    def create_fresh_options():
+        """Create completely fresh options for each attempt"""
         options = uc.ChromeOptions()
-        
-        # Cross-platform options
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        options.add_argument("--disable-web-security")
-        options.add_argument("--allow-running-insecure-content")
-        
-        # Platform-specific options
-        if platform.system() == "Linux":
-            options.add_argument("--headless")
-            options.add_argument("--disable-gpu")
-            options.add_argument("--no-first-run")
-            options.add_argument("--disable-default-apps")
-        else:
-            options.add_argument("--start-maximized")
-        
-        options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-        
-        # Human-like prefs
-        prefs = {
-            "profile.default_content_setting_values.notifications": 2,
-            "profile.default_content_settings.popups": 0,
-        }
-        options.add_experimental_option("prefs", prefs)
-        
-        # Try with detected version first
-        if chrome_version:
-            print(f"🚀 Trying UC Chrome with version {chrome_version}")
-            try:
-                driver = uc.Chrome(version_main=chrome_version, options=options)
-            except Exception as e:
-                print(f"⚠️ UC Chrome with version {chrome_version} failed: {e}")
-                driver = None
-        
-        # Fallback to auto-detection
-        if not driver:
-            print("🚀 Trying UC Chrome with auto-detection")
-            try:
-                driver = uc.Chrome(options=options)
-            except Exception as e:
-                print(f"⚠️ UC Chrome auto-detection failed: {e}")
-                driver = None
-        
-        if driver:
-            print("✅ UC Chrome driver created successfully")
-            # Human-like timeouts
-            driver.set_page_load_timeout(30)
-            driver.implicitly_wait(10)
-            
-            # Remove automation indicators
-            try:
-                driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-            except:
-                pass
-            
-            return driver
-            
-    except ImportError:
-        print("⚠️ undetected_chromedriver not available")
-    except Exception as e:
-        print(f"⚠️ UC Chrome setup failed: {e}")
-    
-    # Fallback to regular Selenium
+        options.add_argument('--disable-images')
+        options.add_argument('--disable-plugins')
+        options.add_argument('--disable-extensions')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--disable-web-security')
+        options.add_argument('--disable-features=VizDisplayCompositor')
+        options.add_argument('--headless')
+        options.add_argument('--user-agent=Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36')
+        # Add timeout settings for long scraping sessions
+        options.add_argument('--timeout=300')
+        options.add_argument('--page-load-strategy=none')
+        return options
+
     try:
-        print("🔄 Falling back to regular Selenium WebDriver")
-        from selenium import webdriver
-        from selenium.webdriver.chrome.service import Service
-        from selenium.webdriver.chrome.options import Options
+        # Try with detected Chrome version first
+        if chrome_version:
+            print(f"Attempting to create driver with Chrome version {chrome_version}")
+            try:
+                driver = uc.Chrome(version_main=chrome_version, options=create_fresh_options())
+                print("✅ Driver created successfully with detected version")
+                return driver
+            except Exception as e:
+                print(f"Failed with detected version {chrome_version}: {e}")
         
-        options = Options()
-        options.add_argument("--headless")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--window-size=1920,1080")
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-        
-        driver = webdriver.Chrome(options=options)
-        driver.set_page_load_timeout(30)
-        driver.implicitly_wait(10)
-        
-        print("✅ Regular Selenium driver created successfully")
+        # Fallback: Let undetected-chromedriver auto-detect with fresh options
+        print("Attempting auto-detection fallback...")
+        driver = uc.Chrome(version_main=None, options=create_fresh_options())
+        print("✅ Driver created successfully with auto-detection")
         return driver
         
     except Exception as e:
-        print(f"❌ All driver creation methods failed: {e}")
+        print(f"Failed to create driver: {e}")
         return None
 
 def human_like_scrape(driver):
@@ -244,7 +228,7 @@ def scrape_with_navigation(driver, base_url, category_name, max_pages):
             try:
                 buttons = driver.find_elements(By.CSS_SELECTOR, selector)
                 for btn in buttons:
-                    if btn.is_displayed() and btn.is_enabled():
+                    if btn.is_displayed() && btn.is_enabled():
                         print("🍪 Accepting cookies...")
                         driver.execute_script("arguments[0].scrollIntoView();", btn)
                         time.sleep(1)
@@ -258,7 +242,7 @@ def scrape_with_navigation(driver, base_url, category_name, max_pages):
     except Exception as e:
         print(f"⚠️ Cookie handling failed: {e}")
     
-    while page <= max_pages and consecutive_blocks < 10 and consecutive_empty < 5:
+    while page <= max_pages && consecutive_blocks < 10 && consecutive_empty < 5:
         try:
             print(f"   🔄 {category_name}: Browsing page {page}")
             
@@ -363,7 +347,7 @@ def scrape_with_navigation(driver, base_url, category_name, max_pages):
                         try:
                             buttons = driver.find_elements(By.CSS_SELECTOR, selector)
                             for btn in buttons:
-                                if btn.is_displayed() and btn.is_enabled():
+                                if btn.is_displayed() && btn.is_enabled():
                                     next_button = btn
                                     break
                             if next_button:
@@ -446,7 +430,7 @@ def scrape_tesco_human_like():
     all_products = []
     
     # Use single driver for all categories (more human-like)
-    driver = setup_stealth_driver()
+    driver = setup_optimized_driver()
     if not driver:
         print("❌ Failed to create driver")
         
@@ -520,13 +504,4 @@ def scrape_tesco_human_like():
         print("✅ Minimal test CSV created")
 
 if __name__ == "__main__":
-    # Import required modules
-    try:
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.support.ui import WebDriverWait
-        from selenium.webdriver.support import expected_conditions as EC
-    except ImportError:
-        print("❌ Selenium not available")
-        sys.exit(1)
-    
     scrape_tesco_human_like()

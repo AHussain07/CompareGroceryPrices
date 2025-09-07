@@ -11,7 +11,7 @@ permissions:
 jobs:
   scrape-tesco:
     runs-on: ubuntu-latest
-    timeout-minutes: 180  # Increased for human-like delays
+    timeout-minutes: 120  # Reduced since optimized scraper is faster
     
     steps:
     - name: Checkout repository
@@ -49,7 +49,7 @@ jobs:
         pip install --upgrade pip
         pip install -r requirements.txt
         
-        # Install additional dependencies for new scraper
+        # Install additional dependencies for optimized scraper
         pip install undetected-chromedriver
         pip install psutil
         
@@ -59,15 +59,14 @@ jobs:
     - name: Create public directory
       run: mkdir -p app/public
     
-    - name: Run Tesco scraper (Human-like)
-      timeout-minutes: 175
+    - name: Run Tesco scraper (Optimized)
+      timeout-minutes: 115
       run: |
         cd WebScrape
-        echo "🤖 Starting Human-like Tesco scraper..."
-        echo "📋 Mode: Sequential browsing with human behavior"
-        echo "⏱️ Strategy: Realistic delays and navigation"
-        echo "🔧 Driver: UC Chrome with minimal stealth"
-        echo "🛡️ Anti-detection: Cookie handling, scrolling, breaks"
+        echo "🚀 Starting Optimized Tesco scraper..."
+        echo "⚡ Mode: Multi-threaded with performance optimizations"
+        echo "🔧 Driver: UC Chrome with dynamic version detection"
+        echo "📊 Strategy: Smart pagination limits and duplicate detection"
         echo "🕐 Started: $(date)"
         
         # Set display for virtual framebuffer
@@ -77,9 +76,9 @@ jobs:
         Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
         sleep 5
         
-        # Run the new-tesco.py script
-        echo "Executing: python new-tesco.py"
-        timeout 10500 python new-tesco.py 2>&1 | tee tesco.log
+        # Run the optimized tesco.py script
+        echo "Executing: python tesco.py"
+        timeout 6900 python tesco.py 2>&1 | tee tesco.log
         
         echo "Tesco scraper completed at: $(date)"
     
@@ -126,7 +125,7 @@ jobs:
             # Show performance stats from log
             echo ""
             echo "📊 Performance stats:"
-            grep -E "Total unique products:|Total time:|Products per second:" tesco.log | tail -3
+            grep -E "Total products:|Total time:|Products per second:" tesco.log | tail -3
             
           else
             echo "⚠️ CSV file created but contains only $product_count products (expected more)"
@@ -154,7 +153,7 @@ jobs:
         name: tesco-logs
         path: |
           WebScrape/tesco.log
-          WebScrape/new-tesco.py
+          WebScrape/tesco.py
         retention-days: 7
         if-no-files-found: ignore
     
@@ -170,27 +169,27 @@ jobs:
         if ! git diff --staged --quiet; then
           echo "📝 Committing changes..."
           
-          git commit -m "🤖 Tesco price update (Human-like) - $(date -u '+%Y-%m-%d %H:%M UTC')
+          git commit -m "🚀 Tesco price update (Optimized) - $(date -u '+%Y-%m-%d %H:%M UTC')
 
           Products: ${{ steps.results.outputs.product_count }}
           Store: Tesco
-          Script: new-tesco.py (Human-like browsing)
-          Processing: Sequential with realistic delays
+          Script: tesco.py (Optimized multi-threaded)
+          Processing: Parallel categories with smart limits
           Categories: All 7 categories
           
           Features:
-          - Human-like navigation and scrolling
-          - Realistic delays between pages
-          - Cookie handling and security block avoidance
-          - Single browser session (more human-like)
-          - Break patterns to avoid detection
+          - Multi-threaded scraping (3 workers)
+          - Dynamic Chrome version detection
+          - Smart pagination limits (25 pages max per category)
+          - Duplicate detection and early stopping
+          - ChromeOptions reuse fix
           
-          Anti-detection measures:
-          - UC Chrome with minimal stealth
-          - Real navigation using Next buttons
-          - Human scrolling patterns
-          - 20-40 second breaks between categories
-          - 15-30 second breaks every 10 pages
+          Optimizations:
+          - UC Chrome with fallback handling
+          - Performance-focused selectors
+          - Memory-efficient processing
+          - Thread-safe operations
+          - Comprehensive error handling
           
           Auto-updated via GitHub Actions"
           
@@ -216,10 +215,10 @@ jobs:
 
           Products: ${{ steps.results.outputs.product_count }} (Partial results)
           Store: Tesco
-          Script: new-tesco.py (Human-like browsing)
-          Status: Partial success - may have been blocked
+          Script: tesco.py (Optimized)
+          Status: Partial success - may have encountered issues
           
-          Note: Scraper may have encountered security blocks
+          Note: Some categories may have failed
           Consider manual review of results
           
           Auto-updated via GitHub Actions"
@@ -231,36 +230,36 @@ jobs:
     - name: Summary
       if: always()
       run: |
-        echo "## 🤖 Tesco Human-like Scraper Summary" >> $GITHUB_STEP_SUMMARY
+        echo "## 🚀 Tesco Optimized Scraper Summary" >> $GITHUB_STEP_SUMMARY
         echo "**Run completed:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
         if [ "${{ steps.results.outputs.success }}" == "true" ]; then
           echo "### ✅ Success" >> $GITHUB_STEP_SUMMARY
           echo "- **Products scraped:** ${{ steps.results.outputs.product_count }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Script:** new-tesco.py (Human-like browsing)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Processing:** Sequential with realistic delays" >> $GITHUB_STEP_SUMMARY
+          echo "- **Script:** tesco.py (Optimized multi-threaded)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Processing:** Parallel categories with smart limits" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** Data committed to repository" >> $GITHUB_STEP_SUMMARY
         elif [ "${{ steps.results.outputs.success }}" == "partial" ]; then
           echo "### ⚠️ Partial Success" >> $GITHUB_STEP_SUMMARY
           echo "- **Products scraped:** ${{ steps.results.outputs.product_count }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Script:** new-tesco.py (may have been blocked)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Script:** tesco.py (some categories may have failed)" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** Partial results committed" >> $GITHUB_STEP_SUMMARY
           echo "- **Note:** May need manual review" >> $GITHUB_STEP_SUMMARY
         else
           echo "### ❌ Scraping Failed" >> $GITHUB_STEP_SUMMARY
           echo "- **Error:** Failed to generate usable CSV file" >> $GITHUB_STEP_SUMMARY
-          echo "- **Script:** new-tesco.py attempted" >> $GITHUB_STEP_SUMMARY
+          echo "- **Script:** tesco.py attempted" >> $GITHUB_STEP_SUMMARY
           echo "- **Logs:** Check uploaded artifacts for details" >> $GITHUB_STEP_SUMMARY
         fi
         
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 🤖 Human-like Scraping Details" >> $GITHUB_STEP_SUMMARY
-        echo "- **Driver:** UC Chrome with minimal stealth" >> $GITHUB_STEP_SUMMARY
-        echo "- **Navigation:** Real button clicks and human scrolling" >> $GITHUB_STEP_SUMMARY
-        echo "- **Delays:** 3-7 seconds between pages" >> $GITHUB_STEP_SUMMARY
-        echo "- **Breaks:** 20-40 seconds between categories" >> $GITHUB_STEP_SUMMARY
-        echo "- **Session:** Single browser (more human-like)" >> $GITHUB_STEP_SUMMARY
-        echo "- **Anti-detection:** Cookie handling, security block detection" >> $GITHUB_STEP_SUMMARY
-        echo "- **Categories:** 7 main categories (sequential)" >> $GITHUB_STEP_SUMMARY
-        echo "- **Timeout:** 3 hours total (for human-like delays)" >> $GITHUB_STEP_SUMMARY
+        echo "### 🚀 Optimized Scraping Details" >> $GITHUB_STEP_SUMMARY
+        echo "- **Driver:** UC Chrome with dynamic version detection" >> $GITHUB_STEP_SUMMARY
+        echo "- **Threading:** 3 parallel workers for categories" >> $GITHUB_STEP_SUMMARY
+        echo "- **Pagination:** Smart 25-page limit per category" >> $GITHUB_STEP_SUMMARY
+        echo "- **Duplicate detection:** Product ID-based deduplication" >> $GITHUB_STEP_SUMMARY
+        echo "- **Error handling:** ChromeOptions reuse fix" >> $GITHUB_STEP_SUMMARY
+        echo "- **Performance:** Memory-efficient processing" >> $GITHUB_STEP_SUMMARY
+        echo "- **Categories:** 7 main categories (parallel)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Timeout:** 2 hours total (optimized speed)" >> $GITHUB_STEP_SUMMARY
