@@ -15,7 +15,7 @@ uc.Chrome.__del__ = lambda self: None
 
 # Thread-safe list for collecting products
 products_lock = threading.Lock()
-driver_creation_lock = threading.Lock()  # Add lock for driver creation
+driver_creation_lock = threading.Lock()
 all_products = []
 
 def get_chrome_version():
@@ -76,17 +76,14 @@ def get_chrome_version():
 
 def setup_optimized_driver():
     """Setup Chrome driver with performance optimizations and thread-safe creation"""
-    with driver_creation_lock:  # Make driver creation thread-safe
-        time.sleep(0.5)  # Small delay to prevent file conflicts
+    with driver_creation_lock:
+        time.sleep(0.5)
         
-        # Get Chrome version
         chrome_version = get_chrome_version()
         
-        # Create fresh options for each driver instance
         options = uc.ChromeOptions()
-        # Performance optimizations
+        # Keep JavaScript enabled for Tesco (they use React/JS heavily)
         options.add_argument('--disable-images')
-        options.add_argument('--disable-javascript')
         options.add_argument('--disable-plugins')
         options.add_argument('--disable-extensions')
         options.add_argument('--disable-dev-shm-usage')
@@ -94,13 +91,11 @@ def setup_optimized_driver():
         options.add_argument('--disable-gpu')
         options.add_argument('--disable-web-security')
         options.add_argument('--disable-features=VizDisplayCompositor')
-        options.add_argument('--disable-background-timer-throttling')
-        options.add_argument('--disable-renderer-backgrounding')
-        options.add_argument('--disable-backgrounding-occluded-windows')
-        options.add_argument('--headless')  # Ensure headless for GitHub Actions
+        options.add_argument('--headless')
+        # Add user agent to appear more like a real browser
+        options.add_argument('--user-agent=Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36')
 
         try:
-            # Try with detected Chrome version first
             if chrome_version:
                 print(f"Attempting to create driver with Chrome version {chrome_version}")
                 try:
@@ -110,7 +105,6 @@ def setup_optimized_driver():
                 except Exception as e:
                     print(f"Failed with detected version {chrome_version}: {e}")
             
-            # Fallback: Let undetected-chromedriver auto-detect
             print("Attempting auto-detection fallback...")
             driver = uc.Chrome(version_main=None, options=options)
             print("✅ Driver created successfully with auto-detection")
@@ -121,7 +115,7 @@ def setup_optimized_driver():
             return None
 
 def scrape_single_category(base_url, category_name):
-    """Scrape a single category with optimizations"""
+    """Scrape a single category with debugging"""
     driver = setup_optimized_driver()
     if driver is None:
         print(f"Failed to create driver for {category_name}")
@@ -130,80 +124,147 @@ def scrape_single_category(base_url, category_name):
     category_products = []
     
     try:
-        # Extract simple category name from URL
         category = base_url.split('/shop/')[1].split('/')[0]
         print(f"Starting category: {category}")
         
-        # Load first page to get pagination info
+        # Load first page
         url = f"{base_url}?page=1"
+        print(f"Loading URL: {url}")
         driver.get(url)
         
-        # Reduced wait time from 10 to 3 seconds
-        try:
-            WebDriverWait(driver, 5).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "div[class*='verticalTile']:first-child"))
-            )
-        except Exception:
-            print(f"No products found in {category}. Skipping.")
+        # Wait longer and check page load
+        time.sleep(3)
+        
+        # Debug: Check what actually loaded
+        page_title = driver.title
+        print(f"Page title: {page_title}")
+        
+        # Check if page contains expected content
+        page_source_snippet = driver.page_source[:500]
+        print(f"Page source snippet: {page_source_snippet}")
+        
+        # Try multiple selectors for products
+        product_selectors = [
+            "div[class*='verticalTile']",
+            "[data-testid*='product']", 
+            ".product-tile",
+            ".product",
+            "[class*='product']"
+        ]
+        
+        products_found = False
+        for selector in product_selectors:
+            try:
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                )
+                product_tiles = driver.find_elements(By.CSS_SELECTOR, selector)
+                if product_tiles:
+                    print(f"✅ Found {len(product_tiles)} products using selector: {selector}")
+                    products_found = True
+                    break
+                else:
+                    print(f"Selector {selector} found no products")
+            except Exception as e:
+                print(f"Selector {selector} failed: {e}")
+                continue
+        
+        if not products_found:
+            print(f"❌ No products found with any selector in {category}")
+            # Save page source for debugging
+            with open(f"debug_{category}.html", "w", encoding="utf-8") as f:
+                f.write(driver.page_source)
+            print(f"Saved page source to debug_{category}.html for inspection")
             return []
         
-        # Get pagination info once
+        # Get pagination info
         max_pages = 1
         try:
-            WebDriverWait(driver, 2).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "a.page"))
-            )
-            page_links = driver.find_elements(By.CSS_SELECTOR, "a.page")
-            page_numbers = []
-            for link in page_links:
-                try:
-                    num = int(link.get_attribute("data-page"))
-                    page_numbers.append(num)
-                except (TypeError, ValueError):
-                    continue
-            max_pages = max(page_numbers) if page_numbers else 1
-        except Exception:
-            max_pages = 1
+            page_elements = driver.find_elements(By.CSS_SELECTOR, "a.page, [data-testid*='page'], .pagination a")
+            if page_elements:
+                page_numbers = []
+                for elem in page_elements:
+                    try:
+                        # Try different attributes
+                        for attr in ['data-page', 'aria-label', 'text']:
+                            if attr == 'text':
+                                text = elem.text.strip()
+                                if text.isdigit():
+                                    page_numbers.append(int(text))
+                            else:
+                                value = elem.get_attribute(attr)
+                                if value and value.isdigit():
+                                    page_numbers.append(int(value))
+                    except:
+                        continue
+                max_pages = max(page_numbers) if page_numbers else 1
+        except Exception as e:
+            print(f"Pagination detection failed: {e}")
         
         print(f"{category}: Found {max_pages} pages")
         
-        # Scrape all pages
+        # Scrape pages
         for page in range(1, max_pages + 1):
-            if page > 1:  # First page already loaded
+            if page > 1:
                 url = f"{base_url}?page={page}"
                 driver.get(url)
-                
-                # Shorter wait for subsequent pages
-                try:
-                    WebDriverWait(driver, 3).until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, "div[class*='verticalTile']:first-child"))
-                    )
-                except Exception:
-                    print(f"{category}: No products on page {page}")
-                    break
+                time.sleep(2)
             
-            # Get all products at once instead of individual waits
-            product_tiles = driver.find_elements(By.CSS_SELECTOR, "div[class*='verticalTile']")
+            # Use the working selector
+            product_tiles = driver.find_elements(By.CSS_SELECTOR, selector)
             
             if not product_tiles:
                 print(f"{category}: No products found on page {page}")
                 break
             
-            # Process products efficiently
+            # Extract product data with multiple selector strategies
             page_products = []
             for product in product_tiles:
                 try:
-                    name_elem = product.find_element(By.CSS_SELECTOR, "a[class*='titleLink']")
-                    name = name_elem.text.strip() if name_elem else "N/A"
+                    # Try multiple name selectors
+                    name = "N/A"
+                    name_selectors = [
+                        "a[class*='titleLink']",
+                        "h3", "h2", "h4",
+                        "[data-testid*='name']",
+                        "[class*='name']",
+                        "[class*='title']"
+                    ]
                     
-                    price_elems = product.find_elements(By.CSS_SELECTOR, "p[class*='priceText']")
-                    price = price_elems[0].text.strip() if price_elems else "N/A"
+                    for name_sel in name_selectors:
+                        try:
+                            name_elem = product.find_element(By.CSS_SELECTOR, name_sel)
+                            if name_elem and name_elem.text.strip():
+                                name = name_elem.text.strip()
+                                break
+                        except:
+                            continue
                     
-                    page_products.append({
-                        "Category": category,
-                        "Name": name,
-                        "Price": price
-                    })
+                    # Try multiple price selectors
+                    price = "N/A"
+                    price_selectors = [
+                        "p[class*='priceText']",
+                        "[data-testid*='price']",
+                        "[class*='price']",
+                        ".price",
+                        "span[class*='price']"
+                    ]
+                    
+                    for price_sel in price_selectors:
+                        try:
+                            price_elem = product.find_element(By.CSS_SELECTOR, price_sel)
+                            if price_elem and price_elem.text.strip():
+                                price = price_elem.text.strip()
+                                break
+                        except:
+                            continue
+                    
+                    if name != "N/A" and price != "N/A":
+                        page_products.append({
+                            "Category": category,
+                            "Name": name,
+                            "Price": price
+                        })
                 except Exception as e:
                     continue
                 
@@ -225,12 +286,10 @@ def scrape_single_category(base_url, category_name):
 
 def save_csv_to_both_locations(df, filename):
     """Save CSV to both local directory and app/public folder"""
-    # Save to local directory
     local_path = f"{filename}.csv"
     df.to_csv(local_path, index=False, encoding="utf-8")
     print(f"✅ Saved to local: {local_path}")
     
-    # Save to app/public directory
     public_dir = "../app/public"
     if not os.path.exists(public_dir):
         os.makedirs(public_dir, exist_ok=True)
@@ -254,39 +313,30 @@ def scrape_tesco_optimized():
     print("Starting optimized Tesco scraper with parallel processing...")
     start_time = time.time()
     
-    # Use ThreadPoolExecutor for parallel processing
-    # Limit to 3 concurrent threads to be respectful to the server
     with ThreadPoolExecutor(max_workers=3) as executor:
-        # Submit all category scraping tasks
         future_to_category = {
             executor.submit(scrape_single_category, url, name): name 
             for url, name in categories
         }
         
-        # Collect results as they complete
         for future in as_completed(future_to_category):
             category_name = future_to_category[future]
             try:
                 category_products = future.result()
                 
-                # Thread-safe addition to global products list
                 with products_lock:
                     all_products.extend(category_products)
                     
             except Exception as e:
                 print(f"Category {category_name} failed: {e}")
     
-    # Save results
     if all_products:
         df = pd.DataFrame(all_products)
-        
-        # Clean data
         df = df.dropna(subset=['Name', 'Price'])
         df = df[df['Name'].str.strip() != '']
         df = df[df['Price'].str.strip() != '']
         df = df.drop_duplicates(subset=['Name', 'Price'])
         
-        # Save to both locations
         save_csv_to_both_locations(df, "tesco")
         
         end_time = time.time()
