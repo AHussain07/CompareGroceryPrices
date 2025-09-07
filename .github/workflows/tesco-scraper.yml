@@ -49,10 +49,14 @@ jobs:
         LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE")
         echo "Using ChromeDriver version: $LATEST_VERSION"
         wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$LATEST_VERSION/linux64/chromedriver-linux64.zip"
+        unzip -l /tmp/chromedriver.zip
         sudo unzip /tmp/chromedriver.zip -d /tmp/
+        file /tmp/chromedriver-linux64/chromedriver
         sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
         sudo chmod +x /usr/local/bin/chromedriver
-        chromedriver --version
+        ls -l /usr/local/bin/chromedriver
+        file /usr/local/bin/chromedriver
+        /usr/local/bin/chromedriver --version
         echo "ChromeDriver installed successfully"
 
     - name: Install Python dependencies
@@ -184,3 +188,9 @@ jobs:
         echo "- **Categories:** Hardcoded in script" >> $GITHUB_STEP_SUMMARY
         echo "- **Pagination:** Full scraping of all pages" >> $GITHUB_STEP_SUMMARY
         echo "- **Timeout:** 1.5 hours total" >> $GITHUB_STEP_SUMMARY
+
+    - name: Debug ChromeDriver permissions
+      run: |
+        ls -l /usr/local/bin/chromedriver
+        file /usr/local/bin/chromedriver
+        whoami
