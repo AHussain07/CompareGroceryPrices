@@ -65,6 +65,9 @@ jobs:
     - name: Create public directory
       run: mkdir -p app/public
 
+    - name: Set ChromeDriver path for undetected-chromedriver
+      run: echo "UCD_CHROMEDRIVER_PATH=/usr/local/bin/chromedriver" >> $GITHUB_ENV
+
     - name: Run Tesco scraper (parallel processing)
       timeout-minutes: 85
       run: |
