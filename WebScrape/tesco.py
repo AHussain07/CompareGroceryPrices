@@ -10,8 +10,12 @@ import os
 import re
 import subprocess
 
+# === Patch uc.Chrome destructor to prevent WinError 6 warnings ===
+uc.Chrome.__del__ = lambda self: None
+
 # Thread-safe list for collecting products
 products_lock = threading.Lock()
+driver_creation_lock = threading.Lock()  # Add lock for driver creation
 all_products = []
 
 def get_chrome_version():
@@ -71,49 +75,58 @@ def get_chrome_version():
         return None
 
 def setup_optimized_driver():
-    """Setup Chrome driver with performance optimizations and dynamic version detection"""
-    # Get Chrome version
-    chrome_version = get_chrome_version()
-    
-    options = uc.ChromeOptions()
-    # Performance optimizations
-    options.add_argument('--disable-images')  # Don't load images - major speed boost
-    options.add_argument('--disable-javascript')  # Disable JS if not needed
-    options.add_argument('--disable-plugins')
-    options.add_argument('--disable-extensions')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-gpu')
-    options.add_argument('--disable-web-security')
-    options.add_argument('--disable-features=VizDisplayCompositor')
-    options.add_argument('--disable-background-timer-throttling')
-    options.add_argument('--disable-renderer-backgrounding')
-    options.add_argument('--disable-backgrounding-occluded-windows')
+    """Setup Chrome driver with performance optimizations and thread-safe creation"""
+    with driver_creation_lock:  # Make driver creation thread-safe
+        time.sleep(0.5)  # Small delay to prevent file conflicts
+        
+        # Get Chrome version
+        chrome_version = get_chrome_version()
+        
+        # Create fresh options for each driver instance
+        options = uc.ChromeOptions()
+        # Performance optimizations
+        options.add_argument('--disable-images')
+        options.add_argument('--disable-javascript')
+        options.add_argument('--disable-plugins')
+        options.add_argument('--disable-extensions')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--disable-web-security')
+        options.add_argument('--disable-features=VizDisplayCompositor')
+        options.add_argument('--disable-background-timer-throttling')
+        options.add_argument('--disable-renderer-backgrounding')
+        options.add_argument('--disable-backgrounding-occluded-windows')
+        options.add_argument('--headless')  # Ensure headless for GitHub Actions
 
-    try:
-        # Try with detected Chrome version first
-        if chrome_version:
-            print(f"Attempting to create driver with Chrome version {chrome_version}")
-            try:
-                driver = uc.Chrome(version_main=chrome_version, options=options)
-                print("✅ Driver created successfully with detected version")
-                return driver
-            except Exception as e:
-                print(f"Failed with detected version {chrome_version}: {e}")
-        
-        # Fallback: Let undetected-chromedriver auto-detect
-        print("Attempting auto-detection fallback...")
-        driver = uc.Chrome(version_main=None, options=options)
-        print("✅ Driver created successfully with auto-detection")
-        return driver
-        
-    except Exception as e:
-        print(f"Failed to create driver: {e}")
-        return None
+        try:
+            # Try with detected Chrome version first
+            if chrome_version:
+                print(f"Attempting to create driver with Chrome version {chrome_version}")
+                try:
+                    driver = uc.Chrome(version_main=chrome_version, options=options)
+                    print("✅ Driver created successfully with detected version")
+                    return driver
+                except Exception as e:
+                    print(f"Failed with detected version {chrome_version}: {e}")
+            
+            # Fallback: Let undetected-chromedriver auto-detect
+            print("Attempting auto-detection fallback...")
+            driver = uc.Chrome(version_main=None, options=options)
+            print("✅ Driver created successfully with auto-detection")
+            return driver
+            
+        except Exception as e:
+            print(f"Failed to create driver: {e}")
+            return None
 
 def scrape_single_category(base_url, category_name):
     """Scrape a single category with optimizations"""
     driver = setup_optimized_driver()
+    if driver is None:
+        print(f"Failed to create driver for {category_name}")
+        return []
+        
     category_products = []
     
     try:
@@ -127,7 +140,7 @@ def scrape_single_category(base_url, category_name):
         
         # Reduced wait time from 10 to 3 seconds
         try:
-            WebDriverWait(driver, 3).until(
+            WebDriverWait(driver, 5).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "div[class*='verticalTile']:first-child"))
             )
         except Exception:
@@ -162,7 +175,7 @@ def scrape_single_category(base_url, category_name):
                 
                 # Shorter wait for subsequent pages
                 try:
-                    WebDriverWait(driver, 2).until(
+                    WebDriverWait(driver, 3).until(
                         EC.presence_of_element_located((By.CSS_SELECTOR, "div[class*='verticalTile']:first-child"))
                     )
                 except Exception:
@@ -187,7 +200,7 @@ def scrape_single_category(base_url, category_name):
                     price = price_elems[0].text.strip() if price_elems else "N/A"
                     
                     page_products.append({
-                        "Category": category,  # Using simplified category name
+                        "Category": category,
                         "Name": name,
                         "Price": price
                     })
@@ -204,7 +217,11 @@ def scrape_single_category(base_url, category_name):
         print(f"Error in {category}: {e}")
         return []
     finally:
-        driver.quit()
+        if driver:
+            try:
+                driver.quit()
+            except:
+                pass
 
 def save_csv_to_both_locations(df, filename):
     """Save CSV to both local directory and app/public folder"""
