@@ -11,7 +11,7 @@ permissions:
 jobs:
   scrape-tesco:
     runs-on: ubuntu-latest
-    timeout-minutes: 120  # Reduced since optimized scraper is faster
+    timeout-minutes: 120
     
     steps:
     - name: Checkout repository
@@ -43,15 +43,32 @@ jobs:
         CHROME_VERSION=$(google-chrome --version)
         echo "Installed Chrome version: $CHROME_VERSION"
     
+    - name: Install matching ChromeDriver
+      run: |
+        # Get Chrome major version
+        CHROME_MAJOR=$(google-chrome --version | sed 's/Google Chrome //' | cut -d'.' -f1)
+        echo "Chrome major version: $CHROME_MAJOR"
+        
+        # Use Chrome for Testing API
+        echo "Getting ChromeDriver for Chrome $CHROME_MAJOR"
+        LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE")
+        echo "Using ChromeDriver version: $LATEST_VERSION"
+        
+        # Download and install ChromeDriver
+        wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$LATEST_VERSION/linux64/chromedriver-linux64.zip"
+        sudo unzip /tmp/chromedriver.zip -d /tmp/
+        sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
+        sudo chmod +x /usr/local/bin/chromedriver
+        
+        # Verify installation
+        chromedriver --version
+        echo "ChromeDriver installed successfully"
+    
     - name: Install Python dependencies
       run: |
         cd WebScrape
         pip install --upgrade pip
         pip install -r requirements.txt
-        
-        # Install additional dependencies for optimized scraper
-        pip install undetected-chromedriver
-        pip install psutil
         
         echo "Installed packages:"
         pip list | grep -E "(selenium|pandas|undetected|psutil|beautifulsoup|lxml|requests)"
@@ -59,14 +76,14 @@ jobs:
     - name: Create public directory
       run: mkdir -p app/public
     
-    - name: Run Tesco scraper (Optimized)
+    - name: Run Tesco scraper (unchanged)
       timeout-minutes: 115
       run: |
         cd WebScrape
-        echo "🚀 Starting Optimized Tesco scraper..."
-        echo "⚡ Mode: Multi-threaded with performance optimizations"
-        echo "🔧 Driver: UC Chrome with dynamic version detection"
-        echo "📊 Strategy: Smart pagination limits and duplicate detection"
+        echo "🛒 Starting Tesco scraper..."
+        echo "📋 Mode: Using original tesco.py (no modifications)"
+        echo "🔧 Sequential processing (MAX_THREADS = 1)"
+        echo "📄 All categories included"
         echo "🕐 Started: $(date)"
         
         # Set display for virtual framebuffer
@@ -76,7 +93,7 @@ jobs:
         Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
         sleep 5
         
-        # Run the optimized tesco.py script
+        # Run the original tesco.py script without modifications
         echo "Executing: python tesco.py"
         timeout 6900 python tesco.py 2>&1 | tee tesco.log
         
@@ -108,7 +125,7 @@ jobs:
           echo "- Total lines: $total_lines"
           
           # Check if we actually got products
-          if [ $product_count -gt 100 ]; then  # Expect at least 100 products
+          if [ $product_count -gt 0 ]; then
             echo "success=true" >> $GITHUB_OUTPUT
             echo "product_count=$product_count" >> $GITHUB_OUTPUT
             
@@ -128,9 +145,9 @@ jobs:
             grep -E "Total products:|Total time:|Products per second:" tesco.log | tail -3
             
           else
-            echo "⚠️ CSV file created but contains only $product_count products (expected more)"
-            echo "success=partial" >> $GITHUB_OUTPUT
-            echo "product_count=$product_count" >> $GITHUB_OUTPUT
+            echo "❌ CSV file created but contains 0 products"
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "product_count=0" >> $GITHUB_OUTPUT
           fi
           
         else
@@ -139,8 +156,8 @@ jobs:
           echo "📋 Directory contents:"
           ls -la
           echo ""
-          echo "📋 Last 100 lines of log:"
-          tail -100 tesco.log 2>/dev/null || echo "No log file"
+          echo "📋 Last 50 lines of log:"
+          tail -50 tesco.log 2>/dev/null || echo "No log file"
           
           echo "success=false" >> $GITHUB_OUTPUT
           echo "product_count=0" >> $GITHUB_OUTPUT
@@ -150,7 +167,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: tesco-logs
+        name: tesco-original-logs
         path: |
           WebScrape/tesco.log
           WebScrape/tesco.py
@@ -158,10 +175,10 @@ jobs:
         if-no-files-found: ignore
     
     - name: Commit changes if successful
-      if: steps.results.outputs.success == 'true' && steps.results.outputs.product_count > 100
+      if: steps.results.outputs.success == 'true' && steps.results.outputs.product_count > 0
       run: |
         git config --global user.email "actions@github.com"
-        git config --global user.name "GitHub Actions - Tesco"
+        git config --global user.name "GitHub Actions - Tesco Original"
         
         # Add CSV file
         git add -f app/public/tesco.csv
@@ -169,27 +186,19 @@ jobs:
         if ! git diff --staged --quiet; then
           echo "📝 Committing changes..."
           
-          git commit -m "🚀 Tesco price update (Optimized) - $(date -u '+%Y-%m-%d %H:%M UTC')
+          git commit -m "🛒 Tesco price update (Original Script) - $(date -u '+%Y-%m-%d %H:%M UTC')
 
           Products: ${{ steps.results.outputs.product_count }}
           Store: Tesco
-          Script: tesco.py (Optimized multi-threaded)
-          Processing: Parallel categories with smart limits
-          Categories: All 7 categories
+          Script: Original tesco.py (unmodified)
+          Processing: Sequential (MAX_THREADS = 1)
+          Categories: All included
           
           Features:
-          - Multi-threaded scraping (3 workers)
-          - Dynamic Chrome version detection
-          - Smart pagination limits (25 pages max per category)
-          - Duplicate detection and early stopping
-          - ChromeOptions reuse fix
-          
-          Optimizations:
-          - UC Chrome with fallback handling
-          - Performance-focused selectors
-          - Memory-efficient processing
-          - Thread-safe operations
-          - Comprehensive error handling
+          - Undetected ChromeDriver
+          - Enhanced cleanup and version detection
+          - Duplicate detection pagination
+          - Multiple selector strategies
           
           Auto-updated via GitHub Actions"
           
@@ -199,67 +208,31 @@ jobs:
           echo "ℹ️ No changes to commit"
         fi
     
-    - name: Commit partial results if needed
-      if: steps.results.outputs.success == 'partial' && steps.results.outputs.product_count > 50
-      run: |
-        git config --global user.email "actions@github.com"
-        git config --global user.name "GitHub Actions - Tesco (Partial)"
-        
-        # Add CSV file
-        git add -f app/public/tesco.csv
-        
-        if ! git diff --staged --quiet; then
-          echo "📝 Committing partial results..."
-          
-          git commit -m "⚠️ Tesco partial update - $(date -u '+%Y-%m-%d %H:%M UTC')
-
-          Products: ${{ steps.results.outputs.product_count }} (Partial results)
-          Store: Tesco
-          Script: tesco.py (Optimized)
-          Status: Partial success - may have encountered issues
-          
-          Note: Some categories may have failed
-          Consider manual review of results
-          
-          Auto-updated via GitHub Actions"
-          
-          git push origin HEAD:${{ github.ref_name }}
-          echo "✅ Partial results pushed"
-        fi
-    
     - name: Summary
       if: always()
       run: |
-        echo "## 🚀 Tesco Optimized Scraper Summary" >> $GITHUB_STEP_SUMMARY
+        echo "## 🛒 Tesco Scraper Summary (Original)" >> $GITHUB_STEP_SUMMARY
         echo "**Run completed:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
         if [ "${{ steps.results.outputs.success }}" == "true" ]; then
           echo "### ✅ Success" >> $GITHUB_STEP_SUMMARY
           echo "- **Products scraped:** ${{ steps.results.outputs.product_count }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Script:** tesco.py (Optimized multi-threaded)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Processing:** Parallel categories with smart limits" >> $GITHUB_STEP_SUMMARY
+          echo "- **Script:** Original tesco.py (unmodified)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Processing:** Sequential (MAX_THREADS = 1)" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** Data committed to repository" >> $GITHUB_STEP_SUMMARY
-        elif [ "${{ steps.results.outputs.success }}" == "partial" ]; then
-          echo "### ⚠️ Partial Success" >> $GITHUB_STEP_SUMMARY
-          echo "- **Products scraped:** ${{ steps.results.outputs.product_count }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Script:** tesco.py (some categories may have failed)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status:** Partial results committed" >> $GITHUB_STEP_SUMMARY
-          echo "- **Note:** May need manual review" >> $GITHUB_STEP_SUMMARY
         else
           echo "### ❌ Scraping Failed" >> $GITHUB_STEP_SUMMARY
           echo "- **Error:** Failed to generate usable CSV file" >> $GITHUB_STEP_SUMMARY
-          echo "- **Script:** tesco.py attempted" >> $GITHUB_STEP_SUMMARY
+          echo "- **Script:** Original tesco.py attempted" >> $GITHUB_STEP_SUMMARY
           echo "- **Logs:** Check uploaded artifacts for details" >> $GITHUB_STEP_SUMMARY
         fi
         
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 🚀 Optimized Scraping Details" >> $GITHUB_STEP_SUMMARY
-        echo "- **Driver:** UC Chrome with dynamic version detection" >> $GITHUB_STEP_SUMMARY
-        echo "- **Threading:** 3 parallel workers for categories" >> $GITHUB_STEP_SUMMARY
-        echo "- **Pagination:** Smart 25-page limit per category" >> $GITHUB_STEP_SUMMARY
-        echo "- **Duplicate detection:** Product ID-based deduplication" >> $GITHUB_STEP_SUMMARY
-        echo "- **Error handling:** ChromeOptions reuse fix" >> $GITHUB_STEP_SUMMARY
-        echo "- **Performance:** Memory-efficient processing" >> $GITHUB_STEP_SUMMARY
-        echo "- **Categories:** 7 main categories (parallel)" >> $GITHUB_STEP_SUMMARY
-        echo "- **Timeout:** 2 hours total (optimized speed)" >> $GITHUB_STEP_SUMMARY
+        echo "### 📋 Technical Details" >> $GITHUB_STEP_SUMMARY
+        echo "- **Driver:** Undetected ChromeDriver" >> $GITHUB_STEP_SUMMARY
+        echo "- **Mode:** Headless (GitHub Actions)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Processing:** Sequential (no threading)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Categories:** All categories from original script" >> $GITHUB_STEP_SUMMARY
+        echo "- **Modifications:** None - using original file" >> $GITHUB_STEP_SUMMARY
+        echo "- **Timeout:** 2 hours total" >> $GITHUB_STEP_SUMMARY

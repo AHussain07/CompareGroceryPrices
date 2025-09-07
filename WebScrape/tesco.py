@@ -1,26 +1,42 @@
 import undetected_chromedriver as uc
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 import time
 import threading
 import os
 import re
 import subprocess
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # === Patch uc.Chrome destructor to prevent WinError 6 warnings ===
 uc.Chrome.__del__ = lambda self: None
 
 # Thread-safe list for collecting products
 products_lock = threading.Lock()
+driver_creation_lock = threading.Lock()
 all_products = []
 
 def get_chrome_version():
     """Get installed Chrome version - adapted from sainsburys.py"""
     try:
-        # Try registry method first (Windows)
+        # Try Linux/GitHub Actions method first
+        try:
+            result = subprocess.run(['google-chrome', '--version'], 
+                                  capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                # Extract the actual version number, not just major
+                version_match = re.search(r'(\d+)\.(\d+)\.(\d+)\.(\d+)', result.stdout)
+                if version_match:
+                    full_version = version_match.group(0)
+                    major_version = int(version_match.group(1))
+                    print(f"Detected Chrome version: {full_version} (major: {major_version})")
+                    return major_version
+        except:
+            pass
+        
+        # Try registry method (Windows)
         try:
             result = subprocess.run([
                 'reg', 'query', 'HKEY_CURRENT_USER\\Software\\Google\\Chrome\\BLBeacon', '/v', 'version'
@@ -53,19 +69,6 @@ def get_chrome_version():
         except:
             pass
         
-        # Try Linux/GitHub Actions method
-        try:
-            result = subprocess.run(['google-chrome', '--version'], 
-                                  capture_output=True, text=True, timeout=10)
-            if result.returncode == 0:
-                version_match = re.search(r'(\d+)', result.stdout)
-                if version_match:
-                    major_version = int(version_match.group(1))
-                    print(f"Detected Chrome version: {major_version}")
-                    return major_version
-        except:
-            pass
-        
         print("Could not detect Chrome version - will use auto-detection")
         return None
         
@@ -74,51 +77,59 @@ def get_chrome_version():
         return None
 
 def setup_optimized_driver():
-    """Setup Chrome driver with performance optimizations and dynamic version detection"""
-    # Get Chrome version
-    chrome_version = get_chrome_version()
-    
-    def create_fresh_options():
-        """Create completely fresh options for each attempt"""
-        options = uc.ChromeOptions()
-        options.add_argument('--disable-images')
-        options.add_argument('--disable-plugins')
-        options.add_argument('--disable-extensions')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-gpu')
-        options.add_argument('--disable-web-security')
-        options.add_argument('--disable-features=VizDisplayCompositor')
-        options.add_argument('--headless')
-        options.add_argument('--user-agent=Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36')
-        # Add timeout settings for long scraping sessions
-        options.add_argument('--timeout=300')
-        options.add_argument('--page-load-strategy=none')
-        return options
+    """Setup Chrome driver with performance optimizations and thread-safe creation"""
+    with driver_creation_lock:
+        time.sleep(0.5)
+        
+        chrome_version = get_chrome_version()
+        
+        # Create fresh options for each attempt
+        def create_options():
+            options = uc.ChromeOptions()
+            options.add_argument('--disable-images')
+            options.add_argument('--disable-plugins')
+            options.add_argument('--disable-extensions')
+            options.add_argument('--disable-dev-shm-usage')
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-gpu')
+            options.add_argument('--disable-web-security')
+            options.add_argument('--disable-features=VizDisplayCompositor')
+            options.add_argument('--headless')
+            options.add_argument('--user-agent=Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36')
+            return options
 
-    try:
-        # Try with detected Chrome version first
-        if chrome_version:
-            print(f"Attempting to create driver with Chrome version {chrome_version}")
+        try:
+            # Try with detected Chrome version first
+            if chrome_version:
+                print(f"Attempting to create driver with Chrome version {chrome_version}")
+                try:
+                    driver = uc.Chrome(version_main=chrome_version, options=create_options())
+                    print("✅ Driver created successfully with detected version")
+                    return driver
+                except Exception as e:
+                    print(f"Failed with detected version {chrome_version}: {e}")
+            
+            # Fallback 1: Try with version 139 (the actual Chrome version shown in error)
+            print("Attempting with Chrome version 139...")
             try:
-                driver = uc.Chrome(version_main=chrome_version, options=create_fresh_options())
-                print("✅ Driver created successfully with detected version")
+                driver = uc.Chrome(version_main=139, options=create_options())
+                print("✅ Driver created successfully with version 139")
                 return driver
             except Exception as e:
-                print(f"Failed with detected version {chrome_version}: {e}")
-        
-        # Fallback: Let undetected-chromedriver auto-detect with fresh options
-        print("Attempting auto-detection fallback...")
-        driver = uc.Chrome(version_main=None, options=create_fresh_options())
-        print("✅ Driver created successfully with auto-detection")
-        return driver
-        
-    except Exception as e:
-        print(f"Failed to create driver: {e}")
-        return None
+                print(f"Failed with version 139: {e}")
+            
+            # Fallback 2: Let undetected-chromedriver auto-detect
+            print("Attempting auto-detection fallback...")
+            driver = uc.Chrome(version_main=None, options=create_options())
+            print("✅ Driver created successfully with auto-detection")
+            return driver
+            
+        except Exception as e:
+            print(f"Failed to create driver: {e}")
+            return None
 
 def scrape_single_category(base_url, category_name):
-    """Scrape a single category with debugging and pagination limits"""
+    """Scrape a single category with debugging"""
     driver = setup_optimized_driver()
     if driver is None:
         print(f"Failed to create driver for {category_name}")
@@ -174,9 +185,16 @@ def scrape_single_category(base_url, category_name):
         
         if not products_found:
             print(f"❌ No products found with any selector in {category}")
+            # Save page source for debugging
+            try:
+                with open(f"debug_{category}.html", "w", encoding="utf-8") as f:
+                    f.write(driver.page_source)
+                print(f"Saved page source to debug_{category}.html for inspection")
+            except:
+                pass
             return []
         
-        # Get pagination info with safety limits like sainsburys.py
+        # Get pagination info
         max_pages = 1
         try:
             page_elements = driver.find_elements(By.CSS_SELECTOR, "a.page, [data-testid*='page'], .pagination a")
@@ -196,24 +214,13 @@ def scrape_single_category(base_url, category_name):
                                     page_numbers.append(int(value))
                     except:
                         continue
-                detected_max_pages = max(page_numbers) if page_numbers else 1
+                max_pages = max(page_numbers) if page_numbers else 1
         except Exception as e:
             print(f"Pagination detection failed: {e}")
-            detected_max_pages = 1
         
-        # Apply safety limits like other scrapers
-        MAX_PAGES_LIMIT = 25  # Similar to sainsburys.py (20) and asda.py (50)
-        max_pages = min(detected_max_pages, MAX_PAGES_LIMIT)
+        print(f"{category}: Found {max_pages} pages")
         
-        if detected_max_pages > MAX_PAGES_LIMIT:
-            print(f"⚠️ {category}: Found {detected_max_pages} pages, limiting to {MAX_PAGES_LIMIT} for performance")
-        
-        print(f"{category}: Will scrape {max_pages} pages")
-        
-        # Scrape pages with duplicate detection and early stopping
-        seen_products = set()
-        consecutive_empty_pages = 0
-        
+        # Scrape pages
         for page in range(1, max_pages + 1):
             if page > 1:
                 url = f"{base_url}?page={page}"
@@ -225,18 +232,10 @@ def scrape_single_category(base_url, category_name):
             
             if not product_tiles:
                 print(f"{category}: No products found on page {page}")
-                consecutive_empty_pages += 1
-                if consecutive_empty_pages >= 2:  # Stop after 2 empty pages
-                    print(f"🛑 Stopping {category} after {consecutive_empty_pages} empty pages")
-                    break
-                continue
+                break
             
-            consecutive_empty_pages = 0  # Reset counter
-            
-            # Extract product data with duplicate checking
+            # Extract product data with multiple selector strategies
             page_products = []
-            new_products_count = 0
-            
             for product in product_tiles:
                 try:
                     # Try multiple name selectors
@@ -278,32 +277,18 @@ def scrape_single_category(base_url, category_name):
                             continue
                     
                     if name != "N/A" and price != "N/A":
-                        # Create unique identifier to avoid duplicates
-                        product_id = f"{name}_{price}"
-                        
-                        if product_id not in seen_products:
-                            page_products.append({
-                                "Category": category,
-                                "Name": name,
-                                "Price": price
-                            })
-                            seen_products.add(product_id)
-                            new_products_count += 1
-                            
+                        page_products.append({
+                            "Category": category,
+                            "Name": name,
+                            "Price": price
+                        })
                 except Exception as e:
                     continue
-            
+                
             category_products.extend(page_products)
-            print(f"{category}: Page {page}/{max_pages} - {new_products_count} new products (Total: {len(category_products)})")
-            
-            # Stop if we're getting mostly duplicates like sainsburys.py
-            if new_products_count == 0:
-                consecutive_empty_pages += 1
-                if consecutive_empty_pages >= 2:
-                    print(f"🛑 Stopping {category} - no new products found")
-                    break
+            print(f"{category}: Page {page}/{max_pages} - {len(page_products)} products")
         
-        print(f"{category}: Completed - {len(category_products)} total unique products")
+        print(f"{category}: Completed - {len(category_products)} total products")
         return category_products
         
     except Exception as e:
@@ -316,25 +301,12 @@ def scrape_single_category(base_url, category_name):
             except:
                 pass
 
-def clean_price(price_text):
-    """Extract numeric price from price text"""
-    if not price_text:
-        return None
-    # Remove all non-digit characters except decimal point
-    cleaned = re.sub(r'[^\d.]', '', price_text)
-    try:
-        return float(cleaned)
-    except ValueError:
-        return None
-
 def save_csv_to_both_locations(df, filename):
-    """Save CSV to both local and public directory"""
-    # Save locally
+    """Save CSV to both local directory and app/public folder"""
     local_path = f"{filename}.csv"
     df.to_csv(local_path, index=False, encoding="utf-8")
     print(f"✅ Saved to local: {local_path}")
     
-    # Save to public directory
     public_dir = "../app/public"
     if not os.path.exists(public_dir):
         os.makedirs(public_dir, exist_ok=True)
@@ -344,30 +316,22 @@ def save_csv_to_both_locations(df, filename):
     print(f"✅ Saved to public: {public_path}")
 
 def scrape_tesco_optimized():
-    """Main function to scrape all Tesco categories with optimization"""
-    print("🚀 Starting OPTIMIZED Tesco scraper...")
-    print("⚡ Mode: Multi-threaded with performance optimizations")
-    print("🔧 Driver: UC Chrome with dynamic version detection")
-    print("📊 Strategy: Smart pagination limits and duplicate detection")
-    print()
-    
-    start_time = time.time()
-    
-    # Define categories to scrape
+    """Main function with single worker like Sainsburys"""
     categories = [
-        ("https://www.tesco.com/groceries/en-GB/shop/fresh-food/all", "Fresh Food"),
-        ("https://www.tesco.com/groceries/en-GB/shop/bakery/all", "Bakery"),
-        ("https://www.tesco.com/groceries/en-GB/shop/frozen-food/all", "Frozen Food"),
-        ("https://www.tesco.com/groceries/en-GB/shop/treats-and-snacks/all", "Treats & Snacks"),
-        ("https://www.tesco.com/groceries/en-GB/shop/food-cupboard/all", "Food Cupboard"),
-        ("https://www.tesco.com/groceries/en-GB/shop/drinks/all", "Drinks"),
-        ("https://www.tesco.com/groceries/en-GB/shop/baby-and-toddler/all", "Baby & Toddler")
+        ("https://www.tesco.com/groceries/en-GB/shop/fresh-food/all", "fresh-food"),
+        ("https://www.tesco.com/groceries/en-GB/shop/bakery/all", "bakery"),
+        ("https://www.tesco.com/groceries/en-GB/shop/frozen-food/all", "frozen-food"),
+        ("https://www.tesco.com/groceries/en-GB/shop/treats-and-snacks/all", "treats-and-snacks"),
+        ("https://www.tesco.com/groceries/en-GB/shop/food-cupboard/all", "food-cupboard"),
+        ("https://www.tesco.com/groceries/en-GB/shop/drinks/all", "drinks"),
+        ("https://www.tesco.com/groceries/en-GB/shop/baby-and-toddler/all", "baby-and-toddler")
     ]
     
-    print(f"📋 Categories to scrape: {len(categories)}")
+    print("Starting optimized Tesco scraper with single worker (like Sainsburys)...")
+    start_time = time.time()
     
-    # Use ThreadPoolExecutor for parallel scraping
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    # Use single worker like Sainsburys for stability
+    with ThreadPoolExecutor(max_workers=1) as executor:
         future_to_category = {
             executor.submit(scrape_single_category, url, name): name 
             for url, name in categories
@@ -377,49 +341,34 @@ def scrape_tesco_optimized():
             category_name = future_to_category[future]
             try:
                 category_products = future.result()
+                
                 with products_lock:
                     all_products.extend(category_products)
-                print(f"✅ {category_name}: {len(category_products)} products collected")
+                    
             except Exception as e:
-                print(f"❌ {category_name}: Failed with error: {e}")
+                print(f"Category {category_name} failed: {e}")
     
-    # Process results
     if all_products:
         df = pd.DataFrame(all_products)
-        
-        # Clean and process data
         df = df.dropna(subset=['Name', 'Price'])
         df = df[df['Name'].str.strip() != '']
         df = df[df['Price'].str.strip() != '']
+        df = df.drop_duplicates(subset=['Name', 'Price'])
         
-        # Remove exact duplicates
-        df = df.drop_duplicates(subset=['Category', 'Name', 'Price'])
-        
-        # Add numeric price column
-        df['Price_Numeric'] = df['Price'].apply(clean_price)
-        
-        # Sort by category and name
-        df = df.sort_values(['Category', 'Name']).reset_index(drop=True)
-        
-        # Save to both locations
         save_csv_to_both_locations(df, "tesco")
         
-        # Calculate and display results
         end_time = time.time()
         duration = end_time - start_time
         
-        print(f"\n{'='*60}")
-        print(f"🎉 OPTIMIZED SCRAPING COMPLETED!")
-        print(f"📊 Total products: {len(df)}")
-        print(f"⏱️ Total time: {duration:.2f} seconds")
-        print(f"🚀 Products per second: {len(df)/duration:.2f}")
-        print(f"📊 By category:")
-        category_counts = df['Category'].value_counts()
-        for category, count in category_counts.items():
-            print(f"   {category}: {count}")
-        print("="*60)
+        print(f"\n{'='*50}")
+        print(f"SCRAPING COMPLETED!")
+        print(f"Total products: {len(all_products)}")
+        print(f"Total time: {duration:.2f} seconds")
+        print(f"Products per second: {len(all_products)/duration:.2f}")
+        print(f"Files saved: tesco.csv (local) and ../app/public/tesco.csv")
+        print(f"{'='*50}")
     else:
-        print("❌ No products were scraped successfully.")
+        print("No products found.")
 
 if __name__ == "__main__":
     scrape_tesco_optimized()
