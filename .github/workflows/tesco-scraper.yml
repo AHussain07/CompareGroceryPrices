@@ -11,7 +11,7 @@ permissions:
 jobs:
   scrape-tesco:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180  # Increased for human-like delays
     
     steps:
     - name: Checkout repository
@@ -43,32 +43,15 @@ jobs:
         CHROME_VERSION=$(google-chrome --version)
         echo "Installed Chrome version: $CHROME_VERSION"
     
-    - name: Install matching ChromeDriver
-      run: |
-        # Get Chrome major version
-        CHROME_MAJOR=$(google-chrome --version | sed 's/Google Chrome //' | cut -d'.' -f1)
-        echo "Chrome major version: $CHROME_MAJOR"
-        
-        # Use Chrome for Testing API
-        echo "Getting ChromeDriver for Chrome $CHROME_MAJOR"
-        LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE")
-        echo "Using ChromeDriver version: $LATEST_VERSION"
-        
-        # Download and install ChromeDriver
-        wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$LATEST_VERSION/linux64/chromedriver-linux64.zip"
-        sudo unzip /tmp/chromedriver.zip -d /tmp/
-        sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
-        sudo chmod +x /usr/local/bin/chromedriver
-        
-        # Verify installation
-        chromedriver --version
-        echo "ChromeDriver installed successfully"
-    
     - name: Install Python dependencies
       run: |
         cd WebScrape
         pip install --upgrade pip
         pip install -r requirements.txt
+        
+        # Install additional dependencies for new scraper
+        pip install undetected-chromedriver
+        pip install psutil
         
         echo "Installed packages:"
         pip list | grep -E "(selenium|pandas|undetected|psutil|beautifulsoup|lxml|requests)"
@@ -76,14 +59,15 @@ jobs:
     - name: Create public directory
       run: mkdir -p app/public
     
-    - name: Run Tesco scraper
-      timeout-minutes: 115
+    - name: Run Tesco scraper (Human-like)
+      timeout-minutes: 175
       run: |
         cd WebScrape
-        echo "🛒 Starting Tesco scraper..."
-        echo "📋 Mode: Using tesco.py with Chrome version detection"
-        echo "🔧 Sequential processing (single worker like Sainsbury's)"
-        echo "📄 All categories included"
+        echo "🤖 Starting Human-like Tesco scraper..."
+        echo "📋 Mode: Sequential browsing with human behavior"
+        echo "⏱️ Strategy: Realistic delays and navigation"
+        echo "🔧 Driver: UC Chrome with minimal stealth"
+        echo "🛡️ Anti-detection: Cookie handling, scrolling, breaks"
         echo "🕐 Started: $(date)"
         
         # Set display for virtual framebuffer
@@ -93,9 +77,9 @@ jobs:
         Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
         sleep 5
         
-        # Run the tesco.py script
-        echo "Executing: python tesco.py"
-        timeout 6900 python tesco.py 2>&1 | tee tesco.log
+        # Run the new-tesco.py script
+        echo "Executing: python new-tesco.py"
+        timeout 10500 python new-tesco.py 2>&1 | tee tesco.log
         
         echo "Tesco scraper completed at: $(date)"
     
@@ -125,7 +109,7 @@ jobs:
           echo "- Total lines: $total_lines"
           
           # Check if we actually got products
-          if [ $product_count -gt 0 ]; then
+          if [ $product_count -gt 100 ]; then  # Expect at least 100 products
             echo "success=true" >> $GITHUB_OUTPUT
             echo "product_count=$product_count" >> $GITHUB_OUTPUT
             
@@ -142,12 +126,12 @@ jobs:
             # Show performance stats from log
             echo ""
             echo "📊 Performance stats:"
-            grep -E "Total products:|Total time:|Products per second:" tesco.log | tail -3
+            grep -E "Total unique products:|Total time:|Products per second:" tesco.log | tail -3
             
           else
-            echo "❌ CSV file created but contains 0 products"
-            echo "success=false" >> $GITHUB_OUTPUT
-            echo "product_count=0" >> $GITHUB_OUTPUT
+            echo "⚠️ CSV file created but contains only $product_count products (expected more)"
+            echo "success=partial" >> $GITHUB_OUTPUT
+            echo "product_count=$product_count" >> $GITHUB_OUTPUT
           fi
           
         else
@@ -156,8 +140,8 @@ jobs:
           echo "📋 Directory contents:"
           ls -la
           echo ""
-          echo "📋 Last 50 lines of log:"
-          tail -50 tesco.log 2>/dev/null || echo "No log file"
+          echo "📋 Last 100 lines of log:"
+          tail -100 tesco.log 2>/dev/null || echo "No log file"
           
           echo "success=false" >> $GITHUB_OUTPUT
           echo "product_count=0" >> $GITHUB_OUTPUT
@@ -170,12 +154,12 @@ jobs:
         name: tesco-logs
         path: |
           WebScrape/tesco.log
-          WebScrape/tesco.py
+          WebScrape/new-tesco.py
         retention-days: 7
         if-no-files-found: ignore
     
     - name: Commit changes if successful
-      if: steps.results.outputs.success == 'true' && steps.results.outputs.product_count > 0
+      if: steps.results.outputs.success == 'true' && steps.results.outputs.product_count > 100
       run: |
         git config --global user.email "actions@github.com"
         git config --global user.name "GitHub Actions - Tesco"
@@ -186,19 +170,27 @@ jobs:
         if ! git diff --staged --quiet; then
           echo "📝 Committing changes..."
           
-          git commit -m "🛒 Tesco price update - $(date -u '+%Y-%m-%d %H:%M UTC')
+          git commit -m "🤖 Tesco price update (Human-like) - $(date -u '+%Y-%m-%d %H:%M UTC')
 
           Products: ${{ steps.results.outputs.product_count }}
           Store: Tesco
-          Script: tesco.py with Chrome version detection
-          Processing: Parallel (MAX_WORKERS = 3)
-          Categories: All included
+          Script: new-tesco.py (Human-like browsing)
+          Processing: Sequential with realistic delays
+          Categories: All 7 categories
           
           Features:
-          - Undetected ChromeDriver with auto-detection
-          - Parallel processing for efficiency
-          - Performance optimizations
-          - Cross-platform Chrome version detection
+          - Human-like navigation and scrolling
+          - Realistic delays between pages
+          - Cookie handling and security block avoidance
+          - Single browser session (more human-like)
+          - Break patterns to avoid detection
+          
+          Anti-detection measures:
+          - UC Chrome with minimal stealth
+          - Real navigation using Next buttons
+          - Human scrolling patterns
+          - 20-40 second breaks between categories
+          - 15-30 second breaks every 10 pages
           
           Auto-updated via GitHub Actions"
           
@@ -208,31 +200,67 @@ jobs:
           echo "ℹ️ No changes to commit"
         fi
     
+    - name: Commit partial results if needed
+      if: steps.results.outputs.success == 'partial' && steps.results.outputs.product_count > 50
+      run: |
+        git config --global user.email "actions@github.com"
+        git config --global user.name "GitHub Actions - Tesco (Partial)"
+        
+        # Add CSV file
+        git add -f app/public/tesco.csv
+        
+        if ! git diff --staged --quiet; then
+          echo "📝 Committing partial results..."
+          
+          git commit -m "⚠️ Tesco partial update - $(date -u '+%Y-%m-%d %H:%M UTC')
+
+          Products: ${{ steps.results.outputs.product_count }} (Partial results)
+          Store: Tesco
+          Script: new-tesco.py (Human-like browsing)
+          Status: Partial success - may have been blocked
+          
+          Note: Scraper may have encountered security blocks
+          Consider manual review of results
+          
+          Auto-updated via GitHub Actions"
+          
+          git push origin HEAD:${{ github.ref_name }}
+          echo "✅ Partial results pushed"
+        fi
+    
     - name: Summary
       if: always()
       run: |
-        echo "## 🛒 Tesco Scraper Summary" >> $GITHUB_STEP_SUMMARY
+        echo "## 🤖 Tesco Human-like Scraper Summary" >> $GITHUB_STEP_SUMMARY
         echo "**Run completed:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
         if [ "${{ steps.results.outputs.success }}" == "true" ]; then
           echo "### ✅ Success" >> $GITHUB_STEP_SUMMARY
           echo "- **Products scraped:** ${{ steps.results.outputs.product_count }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Script:** tesco.py with Chrome version detection" >> $GITHUB_STEP_SUMMARY
-          echo "- **Processing:** Parallel (MAX_WORKERS = 3)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Script:** new-tesco.py (Human-like browsing)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Processing:** Sequential with realistic delays" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** Data committed to repository" >> $GITHUB_STEP_SUMMARY
+        elif [ "${{ steps.results.outputs.success }}" == "partial" ]; then
+          echo "### ⚠️ Partial Success" >> $GITHUB_STEP_SUMMARY
+          echo "- **Products scraped:** ${{ steps.results.outputs.product_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Script:** new-tesco.py (may have been blocked)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** Partial results committed" >> $GITHUB_STEP_SUMMARY
+          echo "- **Note:** May need manual review" >> $GITHUB_STEP_SUMMARY
         else
           echo "### ❌ Scraping Failed" >> $GITHUB_STEP_SUMMARY
           echo "- **Error:** Failed to generate usable CSV file" >> $GITHUB_STEP_SUMMARY
-          echo "- **Script:** tesco.py attempted" >> $GITHUB_STEP_SUMMARY
+          echo "- **Script:** new-tesco.py attempted" >> $GITHUB_STEP_SUMMARY
           echo "- **Logs:** Check uploaded artifacts for details" >> $GITHUB_STEP_SUMMARY
         fi
         
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 📋 Technical Details" >> $GITHUB_STEP_SUMMARY
-        echo "- **Driver:** Undetected ChromeDriver with auto-detection" >> $GITHUB_STEP_SUMMARY
-        echo "- **Mode:** Headless (GitHub Actions)" >> $GITHUB_STEP_SUMMARY
-        echo "- **Processing:** Parallel (3 concurrent threads)" >> $GITHUB_STEP_SUMMARY
-        echo "- **Categories:** 7 main categories" >> $GITHUB_STEP_SUMMARY
-        echo "- **Chrome Detection:** Windows (registry/PowerShell) + Linux support" >> $GITHUB_STEP_SUMMARY
-        echo "- **Timeout:** 2 hours total" >> $GITHUB_STEP_SUMMARY
+        echo "### 🤖 Human-like Scraping Details" >> $GITHUB_STEP_SUMMARY
+        echo "- **Driver:** UC Chrome with minimal stealth" >> $GITHUB_STEP_SUMMARY
+        echo "- **Navigation:** Real button clicks and human scrolling" >> $GITHUB_STEP_SUMMARY
+        echo "- **Delays:** 3-7 seconds between pages" >> $GITHUB_STEP_SUMMARY
+        echo "- **Breaks:** 20-40 seconds between categories" >> $GITHUB_STEP_SUMMARY
+        echo "- **Session:** Single browser (more human-like)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Anti-detection:** Cookie handling, security block detection" >> $GITHUB_STEP_SUMMARY
+        echo "- **Categories:** 7 main categories (sequential)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Timeout:** 3 hours total (for human-like delays)" >> $GITHUB_STEP_SUMMARY
