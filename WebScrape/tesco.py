@@ -94,6 +94,9 @@ def setup_optimized_driver():
         options.add_argument('--disable-features=VizDisplayCompositor')
         options.add_argument('--headless')
         options.add_argument('--user-agent=Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36')
+        # Add timeout settings for long scraping sessions
+        options.add_argument('--timeout=300')
+        options.add_argument('--page-load-strategy=none')
         return options
 
     try:
@@ -102,6 +105,9 @@ def setup_optimized_driver():
             print(f"Attempting to create driver with Chrome version {chrome_version}")
             try:
                 driver = uc.Chrome(version_main=chrome_version, options=create_fresh_options())
+                # Set longer timeouts for extensive scraping
+                driver.set_page_load_timeout(300)
+                driver.implicitly_wait(30)
                 print("✅ Driver created successfully with detected version")
                 return driver
             except Exception as e:
@@ -110,6 +116,8 @@ def setup_optimized_driver():
         # Fallback: Let undetected-chromedriver auto-detect with fresh options
         print("Attempting auto-detection fallback...")
         driver = uc.Chrome(version_main=None, options=create_fresh_options())
+        driver.set_page_load_timeout(300)
+        driver.implicitly_wait(30)
         print("✅ Driver created successfully with auto-detection")
         return driver
         
@@ -209,73 +217,89 @@ def scrape_single_category(base_url, category_name):
         
         print(f"{category}: Found {max_pages} pages")
         
-        # Scrape pages
+        # Scrape ALL pages with retry on timeout
         for page in range(1, max_pages + 1):
-            if page > 1:
-                url = f"{base_url}?page={page}"
-                driver.get(url)
-                time.sleep(1)
+            max_retries = 3
+            retry_count = 0
             
-            # Use the working selector
-            product_tiles = driver.find_elements(By.CSS_SELECTOR, working_selector)
-            
-            if not product_tiles:
-                print(f"{category}: No products found on page {page}")
-                break
-            
-            # Extract product data with multiple selector strategies
-            page_products = []
-            for product in product_tiles:
+            while retry_count < max_retries:
                 try:
-                    # Try multiple name selectors
-                    name = "N/A"
-                    name_selectors = [
-                        "a[class*='titleLink']",
-                        "h3", "h2", "h4",
-                        "[data-testid*='name']",
-                        "[class*='name']",
-                        "[class*='title']"
-                    ]
+                    if page > 1:
+                        url = f"{base_url}?page={page}"
+                        driver.get(url)
+                        time.sleep(2)  # Longer wait between pages
                     
-                    for name_sel in name_selectors:
+                    # Use the working selector
+                    product_tiles = driver.find_elements(By.CSS_SELECTOR, working_selector)
+                    
+                    if not product_tiles:
+                        print(f"{category}: No products found on page {page}")
+                        break
+                    
+                    # Extract product data
+                    page_products = []
+                    for product in product_tiles:
                         try:
-                            name_elem = product.find_element(By.CSS_SELECTOR, name_sel)
-                            if name_elem and name_elem.text.strip():
-                                name = name_elem.text.strip()
-                                break
-                        except:
+                            # Try multiple name selectors
+                            name = "N/A"
+                            name_selectors = [
+                                "a[class*='titleLink']",
+                                "h3", "h2", "h4",
+                                "[data-testid*='name']",
+                                "[class*='name']",
+                                "[class*='title']"
+                            ]
+                            
+                            for name_sel in name_selectors:
+                                try:
+                                    name_elem = product.find_element(By.CSS_SELECTOR, name_sel)
+                                    if name_elem and name_elem.text.strip():
+                                        name = name_elem.text.strip()
+                                        break
+                                except:
+                                    continue
+                            
+                            # Try multiple price selectors
+                            price = "N/A"
+                            price_selectors = [
+                                "p[class*='priceText']",
+                                "[data-testid*='price']",
+                                "[class*='price']",
+                                ".price",
+                                "span[class*='price']"
+                            ]
+                            
+                            for price_sel in price_selectors:
+                                try:
+                                    price_elem = product.find_element(By.CSS_SELECTOR, price_sel)
+                                    if price_elem and price_elem.text.strip():
+                                        price = price_elem.text.strip()
+                                        break
+                                except:
+                                    continue
+                            
+                            if name != "N/A" and price != "N/A":
+                                page_products.append({
+                                    "Category": category,
+                                    "Name": name,
+                                    "Price": price
+                                })
+                        except Exception as e:
                             continue
+                        
+                    category_products.extend(page_products)
+                    print(f"{category}: Page {page}/{max_pages} - {len(page_products)} products")
+                    break  # Success, exit retry loop
                     
-                    # Try multiple price selectors
-                    price = "N/A"
-                    price_selectors = [
-                        "p[class*='priceText']",
-                        "[data-testid*='price']",
-                        "[class*='price']",
-                        ".price",
-                        "span[class*='price']"
-                    ]
-                    
-                    for price_sel in price_selectors:
-                        try:
-                            price_elem = product.find_element(By.CSS_SELECTOR, price_sel)
-                            if price_elem and price_elem.text.strip():
-                                price = price_elem.text.strip()
-                                break
-                        except:
-                            continue
-                    
-                    if name != "N/A" and price != "N/A":
-                        page_products.append({
-                            "Category": category,
-                            "Name": name,
-                            "Price": price
-                        })
                 except Exception as e:
-                    continue
-                
-            category_products.extend(page_products)
-            print(f"{category}: Page {page}/{max_pages} - {len(page_products)} products")
+                    retry_count += 1
+                    if "Read timed out" in str(e) or "HTTPConnectionPool" in str(e):
+                        print(f"{category}: Timeout on page {page}, retry {retry_count}/{max_retries}")
+                        if retry_count < max_retries:
+                            time.sleep(5)  # Wait before retry
+                            continue
+                    print(f"{category}: Error on page {page}: {e}")
+                    break
         
         print(f"{category}: Completed - {len(category_products)} total products")
         return category_products
