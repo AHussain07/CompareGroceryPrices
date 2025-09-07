@@ -82,7 +82,7 @@ jobs:
         cd WebScrape
         echo "🛒 Starting Tesco scraper..."
         echo "📋 Mode: Using tesco.py with Chrome version detection"
-        echo "🔧 Parallel processing (MAX_WORKERS = 3)"
+        echo "🔧 Sequential processing (single worker like Sainsbury's)"
         echo "📄 All categories included"
         echo "🕐 Started: $(date)"
         

@@ -136,7 +136,7 @@ def scrape_single_category(base_url, category_name):
         driver.get(url)
         
         # Wait longer and check page load
-        time.sleep(1.5)
+        time.sleep(1)
         
         # Debug: Check what actually loaded
         page_title = driver.title
@@ -214,7 +214,7 @@ def scrape_single_category(base_url, category_name):
             if page > 1:
                 url = f"{base_url}?page={page}"
                 driver.get(url)
-                time.sleep(1.5)
+                time.sleep(1)
             
             # Use the working selector
             product_tiles = driver.find_elements(By.CSS_SELECTOR, working_selector)
@@ -319,31 +319,26 @@ def scrape_tesco_optimized():
     print("Starting optimized Tesco scraper with single worker (like Sainsburys)...")
     start_time = time.time()
     
-    # Use single worker like Sainsburys for stability
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        future_to_category = {
-            executor.submit(scrape_single_category, url, name): name 
-            for url, name in categories
-        }
+    # Process categories sequentially like sainsburys.py (no threading)
+    for i, (url, name) in enumerate(categories, 1):
+        print(f"\n--- Processing category {i}/{len(categories)}: {name} ---")
+        category_products = scrape_single_category(url, name)
         
-        for future in as_completed(future_to_category):
-            category_name = future_to_category[future]
-            try:
-                category_products = future.result()
-                
-                with products_lock:
-                    all_products.extend(category_products)
-                    
-            except Exception as e:
-                print(f"Category {category_name} failed: {e}")
+        # Add to global products list (no lock needed for sequential processing)
+        all_products.extend(category_products)
+        print(f"Category {name} completed: {len(category_products)} products")
     
+    # Save results
     if all_products:
         df = pd.DataFrame(all_products)
+        
+        # Clean data
         df = df.dropna(subset=['Name', 'Price'])
         df = df[df['Name'].str.strip() != '']
         df = df[df['Price'].str.strip() != '']
         df = df.drop_duplicates(subset=['Name', 'Price'])
         
+        # Save to both locations
         save_csv_to_both_locations(df, "tesco")
         
         end_time = time.time()
