@@ -77,56 +77,45 @@ def get_chrome_version():
         return None
 
 def setup_optimized_driver():
-    """Setup Chrome driver with performance optimizations and thread-safe creation"""
-    with driver_creation_lock:
-        time.sleep(0.5)
-        
-        chrome_version = get_chrome_version()
-        
-        # Create fresh options for each attempt
-        def create_options():
-            options = uc.ChromeOptions()
-            options.add_argument('--disable-images')
-            options.add_argument('--disable-plugins')
-            options.add_argument('--disable-extensions')
-            options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--no-sandbox')
-            options.add_argument('--disable-gpu')
-            options.add_argument('--disable-web-security')
-            options.add_argument('--disable-features=VizDisplayCompositor')
-            options.add_argument('--headless')
-            options.add_argument('--user-agent=Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36')
-            return options
+    """Setup Chrome driver with performance optimizations and dynamic version detection"""
+    # Get Chrome version
+    chrome_version = get_chrome_version()
+    
+    def create_fresh_options():
+        """Create completely fresh options for each attempt"""
+        options = uc.ChromeOptions()
+        options.add_argument('--disable-images')
+        options.add_argument('--disable-plugins')
+        options.add_argument('--disable-extensions')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--disable-web-security')
+        options.add_argument('--disable-features=VizDisplayCompositor')
+        options.add_argument('--headless')
+        options.add_argument('--user-agent=Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36')
+        return options
 
-        try:
-            # Try with detected Chrome version first
-            if chrome_version:
-                print(f"Attempting to create driver with Chrome version {chrome_version}")
-                try:
-                    driver = uc.Chrome(version_main=chrome_version, options=create_options())
-                    print("✅ Driver created successfully with detected version")
-                    return driver
-                except Exception as e:
-                    print(f"Failed with detected version {chrome_version}: {e}")
-            
-            # Fallback 1: Try with version 139 (the actual Chrome version shown in error)
-            print("Attempting with Chrome version 139...")
+    try:
+        # Try with detected Chrome version first
+        if chrome_version:
+            print(f"Attempting to create driver with Chrome version {chrome_version}")
             try:
-                driver = uc.Chrome(version_main=139, options=create_options())
-                print("✅ Driver created successfully with version 139")
+                driver = uc.Chrome(version_main=chrome_version, options=create_fresh_options())
+                print("✅ Driver created successfully with detected version")
                 return driver
             except Exception as e:
-                print(f"Failed with version 139: {e}")
-            
-            # Fallback 2: Let undetected-chromedriver auto-detect
-            print("Attempting auto-detection fallback...")
-            driver = uc.Chrome(version_main=None, options=create_options())
-            print("✅ Driver created successfully with auto-detection")
-            return driver
-            
-        except Exception as e:
-            print(f"Failed to create driver: {e}")
-            return None
+                print(f"Failed with detected version {chrome_version}: {e}")
+        
+        # Fallback: Let undetected-chromedriver auto-detect with fresh options
+        print("Attempting auto-detection fallback...")
+        driver = uc.Chrome(version_main=None, options=create_fresh_options())
+        print("✅ Driver created successfully with auto-detection")
+        return driver
+        
+    except Exception as e:
+        print(f"Failed to create driver: {e}")
+        return None
 
 def scrape_single_category(base_url, category_name):
     """Scrape a single category with debugging"""
@@ -147,7 +136,7 @@ def scrape_single_category(base_url, category_name):
         driver.get(url)
         
         # Wait longer and check page load
-        time.sleep(3)
+        time.sleep(1.5)
         
         # Debug: Check what actually loaded
         page_title = driver.title
@@ -225,7 +214,7 @@ def scrape_single_category(base_url, category_name):
             if page > 1:
                 url = f"{base_url}?page={page}"
                 driver.get(url)
-                time.sleep(2)
+                time.sleep(1.5)
             
             # Use the working selector
             product_tiles = driver.find_elements(By.CSS_SELECTOR, working_selector)
@@ -331,7 +320,7 @@ def scrape_tesco_optimized():
     start_time = time.time()
     
     # Use single worker like Sainsburys for stability
-    with ThreadPoolExecutor(max_workers=1) as executor:
+    with ThreadPoolExecutor(max_workers=3) as executor:
         future_to_category = {
             executor.submit(scrape_single_category, url, name): name 
             for url, name in categories
