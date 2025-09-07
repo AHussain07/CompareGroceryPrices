@@ -11,7 +11,7 @@ permissions:
 jobs:
   scrape-tesco:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120  # Increased for single-threaded processing
 
     steps:
     - name: Checkout repository
@@ -42,48 +42,32 @@ jobs:
         CHROME_VERSION=$(google-chrome --version)
         echo "Installed Chrome version: $CHROME_VERSION"
 
-    - name: Install matching ChromeDriver
-      run: |
-        CHROME_MAJOR=$(google-chrome --version | sed 's/Google Chrome //' | cut -d'.' -f1)
-        echo "Chrome major version: $CHROME_MAJOR"
-        LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE")
-        echo "Using ChromeDriver version: $LATEST_VERSION"
-        wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$LATEST_VERSION/linux64/chromedriver-linux64.zip"
-        unzip -l /tmp/chromedriver.zip
-        unzip /tmp/chromedriver.zip -d /tmp/
-        file /tmp/chromedriver-linux64/chromedriver
-        mv /tmp/chromedriver-linux64/chromedriver ./chromedriver
-        chmod +x ./chromedriver
-        ls -l ./chromedriver
-        file ./chromedriver
-        ./chromedriver --version
-        echo "ChromeDriver installed successfully"
-
-    - name: Set ChromeDriver path for undetected-chromedriver
-      run: echo "UCD_CHROMEDRIVER_PATH=./chromedriver" >> $GITHUB_ENV
-
     - name: Install Python dependencies
       run: |
         cd WebScrape
         pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pandas selenium undetected-chromedriver
+        pip install pandas selenium undetected-chromedriver psutil
 
     - name: Create public directory
       run: mkdir -p app/public
 
-    - name: Run Tesco scraper (parallel processing)
-      timeout-minutes: 85
+    - name: Clean ChromeDriver cache
+      run: |
+        rm -rf ~/.cache/undetected_chromedriver 2>/dev/null || true
+        rm -rf ~/appdata/roaming/undetected_chromedriver 2>/dev/null || true
+
+    - name: Run Tesco scraper (sequential processing)
+      timeout-minutes: 110
       run: |
         cd WebScrape
         export DISPLAY=:99
         Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
         sleep 5
         echo "🛒 Starting Tesco scraper..."
-        echo "👥 Workers: 3 (parallel processing)"
+        echo "👤 Workers: 1 (sequential processing to avoid conflicts)"
         echo "📄 Pages: Full pagination per category"
         echo "🕐 Started: $(date)"
-        timeout 5100 python tesco.py 2>&1 | tee tesco.log
+        timeout 6600 python tesco.py 2>&1 | tee tesco.log
         echo "Tesco scraper completed at: $(date)"
 
     - name: Check results and copy CSV
@@ -148,11 +132,12 @@ jobs:
 
           Products: ${{ steps.results.outputs.product_count }}
           Store: Tesco (all categories)
-          Workers: 3 (parallel processing)
+          Workers: 1 (sequential processing)
           Method: Full pagination
 
           Features:
-          - Parallel processing with 3 workers
+          - Sequential processing to avoid conflicts
+          - Enhanced ChromeDriver cleanup
           - Full pagination scraping
           - Comprehensive product extraction
 
@@ -172,25 +157,20 @@ jobs:
           echo "### ✅ Success" >> $GITHUB_STEP_SUMMARY
           echo "- **Products scraped:** ${{ steps.results.outputs.product_count }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Categories:** All hardcoded" >> $GITHUB_STEP_SUMMARY
-          echo "- **Workers:** 3 parallel threads" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workers:** 1 sequential thread" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** Data committed to repository" >> $GITHUB_STEP_SUMMARY
         else
           echo "### ❌ Scraping Failed" >> $GITHUB_STEP_SUMMARY
           echo "- **Error:** Failed to generate CSV file" >> $GITHUB_STEP_SUMMARY
           echo "- **Logs:** Check uploaded artifacts for details" >> $GITHUB_STEP_SUMMARY
-          echo "- **Workers:** 3 parallel threads attempted" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workers:** 1 sequential thread attempted" >> $GITHUB_STEP_SUMMARY
         fi
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 📋 Technical Details" >> $GITHUB_STEP_SUMMARY
-        echo "- **Driver:** Undetected ChromeDriver" >> $GITHUB_STEP_SUMMARY
-        echo "- **Mode:** Headless (added for GitHub Actions)" >> $GITHUB_STEP_SUMMARY
-        echo "- **Processing:** Parallel with 3 workers" >> $GITHUB_STEP_SUMMARY
+        echo "- **Driver:** Undetected ChromeDriver with enhanced cleanup" >> $GITHUB_STEP_SUMMARY
+        echo "- **Mode:** Headless (optimized for GitHub Actions)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Processing:** Sequential with 1 worker to avoid conflicts" >> $GITHUB_STEP_SUMMARY
         echo "- **Categories:** Hardcoded in script" >> $GITHUB_STEP_SUMMARY
         echo "- **Pagination:** Full scraping of all pages" >> $GITHUB_STEP_SUMMARY
-        echo "- **Timeout:** 1.5 hours total" >> $GITHUB_STEP_SUMMARY
-
-    - name: Debug ChromeDriver permissions
-      run: |
-        ls -l /usr/local/bin/chromedriver
-        file /usr/local/bin/chromedriver
-        whoami
+        echo "- **Timeout:** 2 hours total" >> $GITHUB_STEP_SUMMARY
+        echo "- **Cleanup:** Enhanced ChromeDriver cache cleanup" >> $GITHUB_STEP_SUMMARY
