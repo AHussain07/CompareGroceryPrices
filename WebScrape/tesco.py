@@ -9,6 +9,7 @@ import threading
 import os
 import re
 import subprocess
+from selenium.common.exceptions import TimeoutException, WebDriverException
 
 # === Patch uc.Chrome destructor to prevent WinError 6 warnings ===
 uc.Chrome.__del__ = lambda self: None
@@ -96,6 +97,9 @@ def setup_optimized_driver():
             options.add_argument('--disable-features=VizDisplayCompositor')
             options.add_argument('--headless')
             options.add_argument('--user-agent=Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36')
+            # Increase timeouts to handle slow pages
+            options.add_argument('--timeout=300')
+            options.add_argument('--page-load-strategy=normal')
             return options
 
         try:
@@ -104,6 +108,9 @@ def setup_optimized_driver():
                 print(f"Attempting to create driver with Chrome version {chrome_version}")
                 try:
                     driver = uc.Chrome(version_main=chrome_version, options=create_options())
+                    # Set longer timeouts
+                    driver.set_page_load_timeout(180)  # Increased from default
+                    driver.implicitly_wait(15)  # Increased from default
                     print("✅ Driver created successfully with detected version")
                     return driver
                 except Exception as e:
@@ -113,6 +120,8 @@ def setup_optimized_driver():
             print("Attempting with Chrome version 139...")
             try:
                 driver = uc.Chrome(version_main=139, options=create_options())
+                driver.set_page_load_timeout(180)
+                driver.implicitly_wait(15)
                 print("✅ Driver created successfully with version 139")
                 return driver
             except Exception as e:
@@ -121,6 +130,8 @@ def setup_optimized_driver():
             # Fallback 2: Let undetected-chromedriver auto-detect
             print("Attempting auto-detection fallback...")
             driver = uc.Chrome(version_main=None, options=create_options())
+            driver.set_page_load_timeout(180)
+            driver.implicitly_wait(15)
             print("✅ Driver created successfully with auto-detection")
             return driver
             
@@ -128,178 +139,275 @@ def setup_optimized_driver():
             print(f"Failed to create driver: {e}")
             return None
 
-def scrape_single_category(base_url, category_name):
-    """Scrape a single category with debugging"""
-    driver = setup_optimized_driver()
-    if driver is None:
-        print(f"Failed to create driver for {category_name}")
-        return []
-        
-    category_products = []
+def scrape_category_with_retry(base_url, category_name, max_retries=3):
+    """Scrape a category with retry logic for timeout handling"""
+    category = base_url.split('/shop/')[1].split('/')[0]
+    print(f"Starting category: {category}")
     
-    try:
-        category = base_url.split('/shop/')[1].split('/')[0]
-        print(f"Starting category: {category}")
+    all_category_products = []
+    last_successful_page = 0
+    retry_count = 0
+    
+    while retry_count < max_retries:
+        driver = setup_optimized_driver()
+        if driver is None:
+            print(f"Failed to create driver for {category_name} (attempt {retry_count + 1})")
+            retry_count += 1
+            if retry_count < max_retries:
+                print(f"Waiting 30 seconds before retry...")
+                time.sleep(30)
+            continue
         
-        # Load first page
-        url = f"{base_url}?page=1"
-        print(f"Loading URL: {url}")
-        driver.get(url)
-        
-        # Wait longer and check page load
-        time.sleep(3)
-        
-        # Debug: Check what actually loaded
-        page_title = driver.title
-        print(f"Page title: {page_title}")
-        
-        # Try multiple selectors for products
-        product_selectors = [
-            "div[class*='verticalTile']",
-            "[data-testid*='product']", 
-            ".product-tile",
-            ".product",
-            "[class*='product']",
-            ".tile"
-        ]
-        
-        products_found = False
-        working_selector = None
-        
-        for selector in product_selectors:
-            try:
-                WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, selector))
-                )
-                product_tiles = driver.find_elements(By.CSS_SELECTOR, selector)
-                if product_tiles:
-                    print(f"✅ Found {len(product_tiles)} products using selector: {selector}")
-                    products_found = True
-                    working_selector = selector
-                    break
-                else:
-                    print(f"Selector {selector} found no products")
-            except Exception as e:
-                print(f"Selector {selector} failed: {e}")
-                continue
-        
-        if not products_found:
-            print(f"❌ No products found with any selector in {category}")
-            # Save page source for debugging
-            try:
-                with open(f"debug_{category}.html", "w", encoding="utf-8") as f:
-                    f.write(driver.page_source)
-                print(f"Saved page source to debug_{category}.html for inspection")
-            except:
-                pass
-            return []
-        
-        # Get pagination info
-        max_pages = 1
         try:
-            page_elements = driver.find_elements(By.CSS_SELECTOR, "a.page, [data-testid*='page'], .pagination a")
-            if page_elements:
-                page_numbers = []
-                for elem in page_elements:
-                    try:
-                        # Try different attributes
-                        for attr in ['data-page', 'aria-label', 'text']:
-                            if attr == 'text':
-                                text = elem.text.strip()
-                                if text.isdigit():
-                                    page_numbers.append(int(text))
-                            else:
-                                value = elem.get_attribute(attr)
-                                if value and value.isdigit():
-                                    page_numbers.append(int(value))
-                    except:
-                        continue
-                max_pages = max(page_numbers) if page_numbers else 1
-        except Exception as e:
-            print(f"Pagination detection failed: {e}")
-        
-        print(f"{category}: Found {max_pages} pages")
-        
-        # Scrape pages
-        for page in range(1, max_pages + 1):
-            if page > 1:
-                url = f"{base_url}?page={page}"
-                driver.get(url)
-                time.sleep(2)
+            # If this is a retry, start from where we left off
+            start_page = last_successful_page + 1 if retry_count > 0 else 1
+            print(f"Starting from page {start_page} (attempt {retry_count + 1})")
             
-            # Use the working selector
-            product_tiles = driver.find_elements(By.CSS_SELECTOR, working_selector)
+            # Load first page to get pagination info
+            url = f"{base_url}?page={start_page}"
+            print(f"Loading URL: {url}")
+            driver.get(url)
+            time.sleep(3)
             
-            if not product_tiles:
-                print(f"{category}: No products found on page {page}")
-                break
+            # Debug: Check what actually loaded
+            page_title = driver.title
+            print(f"Page title: {page_title}")
             
-            # Extract product data with multiple selector strategies
-            page_products = []
-            for product in product_tiles:
+            # Try multiple selectors for products - expanded list
+            product_selectors = [
+                "div[class*='verticalTile']",           # Current main selector
+                "[data-testid*='product']",             # TestID products  
+                ".product-tile",                        # Standard product tiles
+                ".product",                             # Generic products
+                "[class*='product']",                   # Any product class
+                ".tile",                                # Tile elements
+                "article[data-testid*='product']",      # Article products
+                "[class*='tile'][class*='product']",    # Combined tile+product
+                "div[class*='product'][class*='tile']", # Div product tiles
+                "li[class*='product']",                 # List item products
+                "[data-auto*='product']"                # Auto-test products
+            ]
+            
+            products_found = False
+            working_selector = None
+            
+            for selector in product_selectors:
                 try:
-                    # Try multiple name selectors
-                    name = "N/A"
-                    name_selectors = [
-                        "a[class*='titleLink']",
-                        "h3", "h2", "h4",
-                        "[data-testid*='name']",
-                        "[class*='name']",
-                        "[class*='title']"
-                    ]
-                    
-                    for name_sel in name_selectors:
-                        try:
-                            name_elem = product.find_element(By.CSS_SELECTOR, name_sel)
-                            if name_elem and name_elem.text.strip():
-                                name = name_elem.text.strip()
-                                break
-                        except:
-                            continue
-                    
-                    # Try multiple price selectors
-                    price = "N/A"
-                    price_selectors = [
-                        "p[class*='priceText']",
-                        "[data-testid*='price']",
-                        "[class*='price']",
-                        ".price",
-                        "span[class*='price']"
-                    ]
-                    
-                    for price_sel in price_selectors:
-                        try:
-                            price_elem = product.find_element(By.CSS_SELECTOR, price_sel)
-                            if price_elem and price_elem.text.strip():
-                                price = price_elem.text.strip()
-                                break
-                        except:
-                            continue
-                    
-                    if name != "N/A" and price != "N/A":
-                        page_products.append({
-                            "Category": category,
-                            "Name": name,
-                            "Price": price
-                        })
+                    WebDriverWait(driver, 15).until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                    )
+                    product_tiles = driver.find_elements(By.CSS_SELECTOR, selector)
+                    if product_tiles:
+                        print(f"✅ Found {len(product_tiles)} products using selector: {selector}")
+                        products_found = True
+                        working_selector = selector
+                        break
+                    else:
+                        print(f"Selector {selector} found no products")
                 except Exception as e:
+                    print(f"Selector {selector} failed: {e}")
                     continue
+            
+            if not products_found:
+                print(f"❌ No products found with any selector in {category}")
+                retry_count += 1
+                if retry_count < max_retries:
+                    print(f"Waiting 30 seconds before retry...")
+                    time.sleep(30)
+                continue
+            
+            # Get pagination info only if this is the first attempt
+            if retry_count == 0:
+                max_pages = 1
+                try:
+                    page_elements = driver.find_elements(By.CSS_SELECTOR, "a.page, [data-testid*='page'], .pagination a")
+                    if page_elements:
+                        page_numbers = []
+                        for elem in page_elements:
+                            try:
+                                # Try different attributes
+                                for attr in ['data-page', 'aria-label', 'text']:
+                                    if attr == 'text':
+                                        text = elem.text.strip()
+                                        if text.isdigit():
+                                            page_numbers.append(int(text))
+                                    else:
+                                        value = elem.get_attribute(attr)
+                                        if value and value.isdigit():
+                                            page_numbers.append(int(value))
+                            except:
+                                continue
+                        max_pages = max(page_numbers) if page_numbers else 1
+                except Exception as e:
+                    print(f"Pagination detection failed: {e}")
                 
-            category_products.extend(page_products)
-            print(f"{category}: Page {page}/{max_pages} - {len(page_products)} products")
-        
-        print(f"{category}: Completed - {len(category_products)} total products")
-        return category_products
-        
-    except Exception as e:
-        print(f"Error in {category}: {e}")
-        return []
-    finally:
-        if driver:
-            try:
-                driver.quit()
-            except:
-                pass
+                # NO PAGE LIMIT - scrape all pages found
+                print(f"{category}: Found {max_pages} pages - will scrape ALL pages")
+            else:
+                # Use the max_pages from previous attempt
+                max_pages = getattr(scrape_category_with_retry, '_max_pages', 1)
+            
+            # Store max_pages for retry attempts
+            scrape_category_with_retry._max_pages = max_pages
+            
+            # Scrape pages with timeout handling
+            consecutive_empty_pages = 0
+            seen_products = set()
+            
+            for page in range(start_page, max_pages + 1):
+                try:
+                    if page > start_page:
+                        url = f"{base_url}?page={page}"
+                        print(f"Loading page {page}/{max_pages}...")
+                        driver.get(url)
+                        time.sleep(2)
+                    
+                    # Use the working selector
+                    product_tiles = driver.find_elements(By.CSS_SELECTOR, working_selector)
+                    print(f"DEBUG: Found {len(product_tiles)} product tiles on page {page}")
+                    
+                    if not product_tiles:
+                        print(f"{category}: No products found on page {page}")
+                        consecutive_empty_pages += 1
+                        if consecutive_empty_pages >= 3:
+                            print(f"🛑 Stopping {category} after {consecutive_empty_pages} empty pages")
+                            break
+                        continue
+                    
+                    consecutive_empty_pages = 0
+                    
+                    # Extract product data with detailed tracking
+                    page_products = []
+                    new_products_count = 0
+                    extraction_failures = 0
+                    
+                    for i, product in enumerate(product_tiles):
+                        try:
+                            # Try multiple name selectors
+                            name = "N/A"
+                            name_selectors = [
+                                "a[class*='titleLink']",
+                                "h3", "h2", "h4",
+                                "[data-testid*='name']",
+                                "[class*='name']",
+                                "[class*='title']",
+                                "a[href*='/product/']",
+                                ".title",
+                                "[class*='product-name']"
+                            ]
+                            
+                            for name_sel in name_selectors:
+                                try:
+                                    name_elem = product.find_element(By.CSS_SELECTOR, name_sel)
+                                    if name_elem and name_elem.text.strip():
+                                        name = name_elem.text.strip()
+                                        break
+                                except:
+                                    continue
+                            
+                            # Try multiple price selectors
+                            price = "N/A"
+                            price_selectors = [
+                                "p[class*='priceText']",
+                                "[data-testid*='price']",
+                                "[class*='price']",
+                                ".price",
+                                "span[class*='price']",
+                                "[class*='cost']",
+                                "[class*='amount']"
+                            ]
+                            
+                            for price_sel in price_selectors:
+                                try:
+                                    price_elem = product.find_element(By.CSS_SELECTOR, price_sel)
+                                    if price_elem and price_elem.text.strip():
+                                        price_text = price_elem.text.strip()
+                                        if '£' in price_text:  # Only accept prices with £ symbol
+                                            price = price_text
+                                            break
+                                except:
+                                    continue
+                            
+                            if name != "N/A" and price != "N/A":
+                                # Create unique identifier to avoid duplicates
+                                product_id = f"{name}_{price}"
+                                
+                                if product_id not in seen_products:
+                                    page_products.append({
+                                        "Category": category,
+                                        "Name": name,
+                                        "Price": price
+                                    })
+                                    seen_products.add(product_id)
+                                    new_products_count += 1
+                            else:
+                                extraction_failures += 1
+                                    
+                        except Exception as e:
+                            extraction_failures += 1
+                            continue
+                    
+                    all_category_products.extend(page_products)
+                    print(f"{category}: Page {page}/{max_pages} - {new_products_count} new products, {extraction_failures} extraction failures (Total: {len(all_category_products)})")
+                    
+                    # Update last successful page
+                    last_successful_page = page
+                    
+                    # Only stop if we have multiple consecutive pages with no new products
+                    if new_products_count == 0:
+                        consecutive_empty_pages += 1
+                        if consecutive_empty_pages >= 3:  # Increased threshold
+                            print(f"🛑 Stopping {category} - no new products found in {consecutive_empty_pages} consecutive pages")
+                            break
+                    else:
+                        consecutive_empty_pages = 0  # Reset if we found products
+                    
+                    # Add a small delay to prevent overwhelming the server
+                    time.sleep(1)
+                    
+                except (TimeoutException, WebDriverException) as e:
+                    print(f"⚠️ Timeout/WebDriver error on page {page}: {e}")
+                    print(f"💾 Saved progress: {len(all_category_products)} products up to page {last_successful_page}")
+                    
+                    # Break inner loop to trigger retry
+                    raise e
+                    
+                except Exception as e:
+                    print(f"❌ Unexpected error on page {page}: {e}")
+                    continue
+            
+            # If we get here, scraping completed successfully
+            print(f"✅ {category}: Completed successfully - {len(all_category_products)} total products from {last_successful_page} pages")
+            return all_category_products
+            
+        except (TimeoutException, WebDriverException) as e:
+            print(f"⚠️ {category}: Connection timeout/error after page {last_successful_page}")
+            retry_count += 1
+            
+            if retry_count < max_retries:
+                wait_time = 30 * retry_count  # Exponential backoff
+                print(f"🔄 Retrying in {wait_time} seconds... (attempt {retry_count + 1}/{max_retries})")
+                time.sleep(wait_time)
+            else:
+                print(f"❌ {category}: Max retries reached. Returning partial results: {len(all_category_products)} products from {last_successful_page} pages")
+                return all_category_products
+                
+        except Exception as e:
+            print(f"❌ Unexpected error in {category}: {e}")
+            retry_count += 1
+            if retry_count < max_retries:
+                print(f"Waiting 30 seconds before retry...")
+                time.sleep(30)
+            
+        finally:
+            if driver:
+                try:
+                    driver.quit()
+                except:
+                    pass
+    
+    print(f"⚠️ {category}: Returning partial results after all retries: {len(all_category_products)} products from {last_successful_page} pages")
+    return all_category_products
 
 def save_csv_to_both_locations(df, filename):
     """Save CSV to both local directory and app/public folder"""
@@ -316,7 +424,7 @@ def save_csv_to_both_locations(df, filename):
     print(f"✅ Saved to public: {public_path}")
 
 def scrape_tesco_optimized():
-    """Main function with single worker like Sainsburys"""
+    """Main function with retry logic and timeout handling"""
     categories = [
         ("https://www.tesco.com/groceries/en-GB/shop/fresh-food/all", "fresh-food"),
         ("https://www.tesco.com/groceries/en-GB/shop/bakery/all", "bakery"),
@@ -327,13 +435,13 @@ def scrape_tesco_optimized():
         ("https://www.tesco.com/groceries/en-GB/shop/baby-and-toddler/all", "baby-and-toddler")
     ]
     
-    print("Starting optimized Tesco scraper with single worker (like Sainsburys)...")
+    print("Starting optimized Tesco scraper with NO PAGE LIMITS...")
     start_time = time.time()
     
     # Use single worker like Sainsburys for stability
     with ThreadPoolExecutor(max_workers=1) as executor:
         future_to_category = {
-            executor.submit(scrape_single_category, url, name): name 
+            executor.submit(scrape_category_with_retry, url, name): name 
             for url, name in categories
         }
         
@@ -345,8 +453,10 @@ def scrape_tesco_optimized():
                 with products_lock:
                     all_products.extend(category_products)
                     
+                print(f"✅ {category_name}: {len(category_products)} products collected")
+                    
             except Exception as e:
-                print(f"Category {category_name} failed: {e}")
+                print(f"❌ Category {category_name} failed: {e}")
     
     if all_products:
         df = pd.DataFrame(all_products)
@@ -361,14 +471,14 @@ def scrape_tesco_optimized():
         duration = end_time - start_time
         
         print(f"\n{'='*50}")
-        print(f"SCRAPING COMPLETED!")
-        print(f"Total products: {len(all_products)}")
+        print(f"SCRAPING COMPLETED WITH NO PAGE LIMITS!")
+        print(f"Total products: {len(df)}")
         print(f"Total time: {duration:.2f} seconds")
-        print(f"Products per second: {len(all_products)/duration:.2f}")
+        print(f"Products per second: {len(df)/duration:.2f}")
         print(f"Files saved: tesco.csv (local) and ../app/public/tesco.csv")
         print(f"{'='*50}")
     else:
-        print("No products found.")
+        print("❌ No products found.")
 
 if __name__ == "__main__":
     scrape_tesco_optimized()
