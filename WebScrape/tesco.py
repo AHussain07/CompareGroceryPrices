@@ -21,7 +21,22 @@ all_products = []
 def get_chrome_version():
     """Get installed Chrome version - adapted from sainsburys.py"""
     try:
-        # Try registry method first (Windows)
+        # Try Linux/GitHub Actions method first
+        try:
+            result = subprocess.run(['google-chrome', '--version'], 
+                                  capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                # Extract the actual version number, not just major
+                version_match = re.search(r'(\d+)\.(\d+)\.(\d+)\.(\d+)', result.stdout)
+                if version_match:
+                    full_version = version_match.group(0)
+                    major_version = int(version_match.group(1))
+                    print(f"Detected Chrome version: {full_version} (major: {major_version})")
+                    return major_version
+        except:
+            pass
+        
+        # Try registry method (Windows)
         try:
             result = subprocess.run([
                 'reg', 'query', 'HKEY_CURRENT_USER\\Software\\Google\\Chrome\\BLBeacon', '/v', 'version'
@@ -54,19 +69,6 @@ def get_chrome_version():
         except:
             pass
         
-        # Try Linux/GitHub Actions method
-        try:
-            result = subprocess.run(['google-chrome', '--version'], 
-                                  capture_output=True, text=True, timeout=10)
-            if result.returncode == 0:
-                version_match = re.search(r'(\d+)', result.stdout)
-                if version_match:
-                    major_version = int(version_match.group(1))
-                    print(f"Detected Chrome version: {major_version}")
-                    return major_version
-        except:
-            pass
-        
         print("Could not detect Chrome version - will use auto-detection")
         return None
         
@@ -81,32 +83,44 @@ def setup_optimized_driver():
         
         chrome_version = get_chrome_version()
         
-        options = uc.ChromeOptions()
-        # Keep JavaScript enabled for Tesco (they use React/JS heavily)
-        options.add_argument('--disable-images')
-        options.add_argument('--disable-plugins')
-        options.add_argument('--disable-extensions')
-        options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-gpu')
-        options.add_argument('--disable-web-security')
-        options.add_argument('--disable-features=VizDisplayCompositor')
-        options.add_argument('--headless')
-        # Add user agent to appear more like a real browser
-        options.add_argument('--user-agent=Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36')
+        # Create fresh options for each attempt
+        def create_options():
+            options = uc.ChromeOptions()
+            options.add_argument('--disable-images')
+            options.add_argument('--disable-plugins')
+            options.add_argument('--disable-extensions')
+            options.add_argument('--disable-dev-shm-usage')
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-gpu')
+            options.add_argument('--disable-web-security')
+            options.add_argument('--disable-features=VizDisplayCompositor')
+            options.add_argument('--headless')
+            options.add_argument('--user-agent=Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36')
+            return options
 
         try:
+            # Try with detected Chrome version first
             if chrome_version:
                 print(f"Attempting to create driver with Chrome version {chrome_version}")
                 try:
-                    driver = uc.Chrome(version_main=chrome_version, options=options)
+                    driver = uc.Chrome(version_main=chrome_version, options=create_options())
                     print("✅ Driver created successfully with detected version")
                     return driver
                 except Exception as e:
                     print(f"Failed with detected version {chrome_version}: {e}")
             
+            # Fallback 1: Try with version 139 (the actual Chrome version shown in error)
+            print("Attempting with Chrome version 139...")
+            try:
+                driver = uc.Chrome(version_main=139, options=create_options())
+                print("✅ Driver created successfully with version 139")
+                return driver
+            except Exception as e:
+                print(f"Failed with version 139: {e}")
+            
+            # Fallback 2: Let undetected-chromedriver auto-detect
             print("Attempting auto-detection fallback...")
-            driver = uc.Chrome(version_main=None, options=options)
+            driver = uc.Chrome(version_main=None, options=create_options())
             print("✅ Driver created successfully with auto-detection")
             return driver
             
@@ -139,20 +153,19 @@ def scrape_single_category(base_url, category_name):
         page_title = driver.title
         print(f"Page title: {page_title}")
         
-        # Check if page contains expected content
-        page_source_snippet = driver.page_source[:500]
-        print(f"Page source snippet: {page_source_snippet}")
-        
         # Try multiple selectors for products
         product_selectors = [
             "div[class*='verticalTile']",
             "[data-testid*='product']", 
             ".product-tile",
             ".product",
-            "[class*='product']"
+            "[class*='product']",
+            ".tile"
         ]
         
         products_found = False
+        working_selector = None
+        
         for selector in product_selectors:
             try:
                 WebDriverWait(driver, 10).until(
@@ -162,6 +175,7 @@ def scrape_single_category(base_url, category_name):
                 if product_tiles:
                     print(f"✅ Found {len(product_tiles)} products using selector: {selector}")
                     products_found = True
+                    working_selector = selector
                     break
                 else:
                     print(f"Selector {selector} found no products")
@@ -172,9 +186,12 @@ def scrape_single_category(base_url, category_name):
         if not products_found:
             print(f"❌ No products found with any selector in {category}")
             # Save page source for debugging
-            with open(f"debug_{category}.html", "w", encoding="utf-8") as f:
-                f.write(driver.page_source)
-            print(f"Saved page source to debug_{category}.html for inspection")
+            try:
+                with open(f"debug_{category}.html", "w", encoding="utf-8") as f:
+                    f.write(driver.page_source)
+                print(f"Saved page source to debug_{category}.html for inspection")
+            except:
+                pass
             return []
         
         # Get pagination info
@@ -211,7 +228,7 @@ def scrape_single_category(base_url, category_name):
                 time.sleep(2)
             
             # Use the working selector
-            product_tiles = driver.find_elements(By.CSS_SELECTOR, selector)
+            product_tiles = driver.find_elements(By.CSS_SELECTOR, working_selector)
             
             if not product_tiles:
                 print(f"{category}: No products found on page {page}")
@@ -299,7 +316,7 @@ def save_csv_to_both_locations(df, filename):
     print(f"✅ Saved to public: {public_path}")
 
 def scrape_tesco_optimized():
-    """Main function with parallel processing"""
+    """Main function with single worker like Sainsburys"""
     categories = [
         ("https://www.tesco.com/groceries/en-GB/shop/fresh-food/all", "fresh-food"),
         ("https://www.tesco.com/groceries/en-GB/shop/bakery/all", "bakery"),
@@ -310,10 +327,11 @@ def scrape_tesco_optimized():
         ("https://www.tesco.com/groceries/en-GB/shop/baby-and-toddler/all", "baby-and-toddler")
     ]
     
-    print("Starting optimized Tesco scraper with parallel processing...")
+    print("Starting optimized Tesco scraper with single worker (like Sainsburys)...")
     start_time = time.time()
     
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    # Use single worker like Sainsburys for stability
+    with ThreadPoolExecutor(max_workers=1) as executor:
         future_to_category = {
             executor.submit(scrape_single_category, url, name): name 
             for url, name in categories
