@@ -52,8 +52,8 @@ jobs:
         unzip -l /tmp/chromedriver.zip
         sudo unzip /tmp/chromedriver.zip -d /tmp/
         file /tmp/chromedriver-linux64/chromedriver
-        sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
-        sudo chmod +x /usr/local/bin/chromedriver
+        mv /tmp/chromedriver-linux64/chromedriver $GITHUB_WORKSPACE/chromedriver
+        chmod +x $GITHUB_WORKSPACE/chromedriver
         ls -l /usr/local/bin/chromedriver
         file /usr/local/bin/chromedriver
         /usr/local/bin/chromedriver --version
@@ -70,7 +70,7 @@ jobs:
       run: mkdir -p app/public
 
     - name: Set ChromeDriver path for undetected-chromedriver
-      run: echo "UCD_CHROMEDRIVER_PATH=/usr/local/bin/chromedriver" >> $GITHUB_ENV
+      run: echo "UCD_CHROMEDRIVER_PATH=$GITHUB_WORKSPACE/chromedriver" >> $GITHUB_ENV
 
     - name: Run Tesco scraper (parallel processing)
       timeout-minutes: 85
