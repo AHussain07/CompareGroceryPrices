@@ -320,6 +320,37 @@ def setup_optimized_driver():
         print(f"Failed to create driver: {e}")
         return None
 
+def handle_cookies_once(driver):
+    """Handle cookies banner if present"""
+    try:
+        # Wait for and click cookie accept button
+        cookie_selectors = [
+            '//button[contains(text(), "Accept") and contains(text(), "Cookies")]',
+            '//button[contains(text(), "Accept") and contains(text(), "cookies")]',
+            '//button[contains(text(), "Accept All")]',
+            '//button[@id="onetrust-accept-btn-handler"]',
+            '//button[contains(@class, "cookie") and contains(text(), "Accept")]'
+        ]
+        
+        for selector in cookie_selectors:
+            try:
+                cookie_button = WebDriverWait(driver, 3).until(
+                    EC.element_to_be_clickable((By.XPATH, selector))
+                )
+                cookie_button.click()
+                print("   🍪 Accepted cookies")
+                time.sleep(1)
+                return True
+            except:
+                continue
+        
+        print("   ℹ️ No cookie banner found")
+        return False
+        
+    except Exception as e:
+        print(f"   ⚠️ Cookie handling error: {e}")
+        return False
+
 def check_pagination_and_duplicates(driver, current_page_products, all_seen_products):
     """Check pagination status and detect duplicate content"""
     
@@ -410,47 +441,122 @@ def scrape_category(driver, url):
             print(f"   📄 Scraping page {page}...")
             driver.get(paged_url)
             
-            # Shorter waits for GitHub Actions
+            # Debug: Check what's actually on the page
+            print(f"   🔍 Page title: {driver.title}")
+            print(f"   🔍 Current URL: {driver.current_url}")
+
+            if page == 1:
+                handle_cookies_once(driver)
+
             time.sleep(random.uniform(0.5, 1.0))
 
+            # Check for any content at all
             try:
-                WebDriverWait(driver, 15).until(
-                    EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".pt__content"))
-                )
+                body_text = driver.find_element(By.TAG_NAME, "body").text
+                if "blocked" in body_text.lower() or "captcha" in body_text.lower():
+                    print(f"   🚫 Page appears to be blocked or showing CAPTCHA")
+                    break
             except:
-                print(f"   ⚠️ No products found on page {page}")
-                break
+                pass
 
-            product_elements = driver.find_elements(By.CSS_SELECTOR, ".pt__content")
+            # Try multiple selectors for product containers
+            product_selectors = [
+                ".pt__content",
+                ".pt",
+                "[data-testid='product-tile']",
+                ".product-tile",
+                ".ln-o-grid__item"
+            ]
+
+            product_elements = []
+            for selector in product_selectors:
+                try:
+                    WebDriverWait(driver, 10).until(
+                        EC.presence_of_all_elements_located((By.CSS_SELECTOR, selector))
+                    )
+                    product_elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                    if product_elements:
+                        print(f"   ✅ Found {len(product_elements)} products using selector: {selector}")
+                        break
+                except:
+                    continue
+
             if not product_elements:
                 print(f"   ⚠️ No product elements found on page {page}")
+                # Debug: show what elements are actually present
+                all_elements = driver.find_elements(By.CSS_SELECTOR, "*[class]")
+                print(f"   🔍 Found {len(all_elements)} elements with classes on page")
+                if len(all_elements) < 50:  # Very few elements suggests page didn't load properly
+                    print(f"   🚫 Page appears to not have loaded properly")
                 break
 
             page_products = []
             
             for product in product_elements:
                 try:
-                    name = product.find_element(By.CSS_SELECTOR, ".pt__info a").text.strip()
+                    # Try multiple selectors for product name
+                    name_selectors = [
+                        ".pt__info a",
+                        ".pt__link",
+                        "[data-testid='product-tile-title']",
+                        "h3 a",
+                        ".product-title a"
+                    ]
                     
-                    # Extract regular price
-                    try:
-                        regular_price_elem = product.find_element(By.CSS_SELECTOR, '.pt__cost__retail-price')
-                        price = regular_price_elem.text.strip()
-                        price_match = re.search(r'£[\d.]+', price)
-                        price = price_match.group() if price_match else price.split()[0] if price else "N/A"
-                    except:
-                        price = "N/A"
+                    name = None
+                    for name_selector in name_selectors:
+                        try:
+                            name_elem = product.find_element(By.CSS_SELECTOR, name_selector)
+                            name = name_elem.text.strip()
+                            if name:
+                                break
+                        except:
+                            continue
+                    
+                    if not name:
+                        continue
+                    
+                    # Try multiple selectors for regular price
+                    price_selectors = [
+                        '.pt__cost__retail-price',
+                        '[data-testid="price-retail"]',
+                        '.price',
+                        '.pt__cost .cost'
+                    ]
+                    
+                    price = "N/A"
+                    for price_selector in price_selectors:
+                        try:
+                            price_elem = product.find_element(By.CSS_SELECTOR, price_selector)
+                            price_text = price_elem.text.strip()
+                            price_match = re.search(r'£[\d.]+', price_text)
+                            if price_match:
+                                price = price_match.group()
+                                break
+                        except:
+                            continue
 
-                    # Extract nectar price
-                    try:
-                        nectar_elem = product.find_element(By.CSS_SELECTOR, '.pt__cost--price')
-                        nectar_text = nectar_elem.text.strip()
-                        nectar_match = re.search(r'£[\d.]+', nectar_text)
-                        nectar_price = nectar_match.group() if nectar_match else "N/A"
-                    except:
-                        nectar_price = "N/A"
+                    # Try multiple selectors for nectar price
+                    nectar_selectors = [
+                        '.pt__cost--price',
+                        '[data-testid="price-nectar"]',
+                        '.nectar-price',
+                        '.pt__cost .nectar'
+                    ]
+                    
+                    nectar_price = "N/A"
+                    for nectar_selector in nectar_selectors:
+                        try:
+                            nectar_elem = product.find_element(By.CSS_SELECTOR, nectar_selector)
+                            nectar_text = nectar_elem.text.strip()
+                            nectar_match = re.search(r'£[\d.]+', nectar_text)
+                            if nectar_match:
+                                nectar_price = nectar_match.group()
+                                break
+                        except:
+                            continue
 
-                    if name and price:
+                    if name and price != "N/A":
                         product_data = {
                             "Category": category_name,
                             "Product Name": name,
