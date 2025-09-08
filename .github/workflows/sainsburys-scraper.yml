@@ -51,7 +51,7 @@ jobs:
         
         # Use Chrome for Testing API
         echo "Getting ChromeDriver for Chrome $CHROME_MAJOR"
-        LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE")
+        LATEST_VERSION="139.0.6778.85"  # Force Chrome 139 compatible version
         echo "Using ChromeDriver version: $LATEST_VERSION"
         
         # Download and install ChromeDriver
