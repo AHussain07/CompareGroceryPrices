@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 import time
 import threading
+import re
 
 # Thread-safe storage
 products_lock = threading.Lock()
@@ -124,6 +125,33 @@ CATEGORY_URLS = [
     "https://www.sainsburys.co.uk/gol-ui/groceries/meat-and-fish/pork/c:1020384",
     "https://www.sainsburys.co.uk/gol-ui/groceries/meat-and-fish/turkey/c:1054773"
 ]
+def clean_price(price_text):
+    """Extract first clean price from text"""
+    if not price_text:
+        return "N/A"
+    
+    # Remove newlines and extra spaces
+    price_text = re.sub(r'\s+', ' ', price_text.strip())
+    
+    # Extract first price with £ symbol
+    price_match = re.search(r'£[\d.]+', price_text)
+    if price_match:
+        return price_match.group()
+    
+    return "N/A"
+
+def extract_nectar_price(price_text):
+    """Extract nectar price if available"""
+    if not price_text or "with Nectar" not in price_text:
+        return "N/A"
+    
+    # Split by "with Nectar" and get the first part (nectar price)
+    nectar_part = price_text.split("with Nectar")[0].strip()
+    price_match = re.search(r'£[\d.]+', nectar_part)
+    if price_match:
+        return price_match.group()
+    
+    return "N/A"
 
 def setup_optimized_driver():
     """Setup optimized Chrome driver"""
@@ -174,18 +202,8 @@ def scrape_single_category(base_url):
         seen_product_count = 0
         last_product_count = 0
         
-        # Extract category name properly from URL - use the last meaningful part
-        url_parts = base_url.split('/')
-        # Get the part before the category ID (c:xxxxx)
-        for i, part in enumerate(url_parts):
-            if part.startswith('c:'):
-                if i > 0:
-                    category_name = url_parts[i-1]
-                    break
-        else:
-            # Fallback to last part of path
-            category_name = url_parts[-1] if url_parts[-1] else "unknown"
-        
+        # Extract category name from URL path components
+        category_name = base_url.split('/groceries/')[1].split('/')[0]
         print(f"Starting: {category_name}")
         
         page_num = 1
@@ -238,16 +256,21 @@ def scrape_single_category(base_url):
                     if not name:
                         continue
                     
-                    # Extract price - return to simple format like before
-                    price_elem = product.find_element(By.CSS_SELECTOR, '.pt__cost__retail-price')
-                    price = price_elem.text.strip()
-                    
-                    # Extract Nectar price - simple approach
-                    try:
-                        nectar_elem = product.find_element(By.CSS_SELECTOR, '.pt__cost--price')
-                        nectar_price = nectar_elem.text.strip()
-                    except Exception:
-                        nectar_price = 'N/A'
+                    # Get the entire price container
+                    price_container = product.find_element(By.CSS_SELECTOR, '.pt__cost')
+                    full_price_text = price_container.text.strip()
+
+                    # Extract clean regular price and nectar price
+                    if "with Nectar" in full_price_text:
+                        # Has nectar offer
+                        nectar_price = extract_nectar_price(full_price_text)
+                        # Regular price is usually after "with Nectar"
+                        regular_part = full_price_text.split("with Nectar")[1] if len(full_price_text.split("with Nectar")) > 1 else full_price_text
+                        price = clean_price(regular_part)
+                    else:
+                        # No nectar offer
+                        price = clean_price(full_price_text)
+                        nectar_price = "N/A"
                     
                     # Check for duplicates
                     key = (name, category_name)
@@ -321,12 +344,6 @@ def scrape_sainsburys_optimized():
     if all_products:
         df = pd.DataFrame(all_products)
         df.to_csv("sainsburys.csv", index=False)
-        
-        # Also save to app folder if it exists
-        try:
-            df.to_csv("../app/public/sainsburys.csv", index=False)
-        except Exception:
-            pass
         
         end_time = time.time()
         duration = end_time - start_time
