@@ -459,13 +459,12 @@ def scrape_category(driver, url):
             except:
                 pass
 
-            # Try multiple selectors for product containers
+            # Try multiple selectors for product containers - updated for both patterns
             product_selectors = [
-                ".pt__content",
-                ".pt",
-                "[data-testid='product-tile']",
-                ".product-tile",
-                ".ln-o-grid__item"
+                ".pt__content",           # Direct content divs (first pattern)
+                ".pt-grid-item",          # Grid items containing products (second pattern)  
+                "article.pt",             # Article elements (second pattern)
+                ".ln-c-card.pt",          # Card elements (second pattern)
             ]
 
             product_elements = []
@@ -483,78 +482,39 @@ def scrape_category(driver, url):
 
             if not product_elements:
                 print(f"   ⚠️ No product elements found on page {page}")
-                # Debug: show what elements are actually present
-                all_elements = driver.find_elements(By.CSS_SELECTOR, "*[class]")
-                print(f"   🔍 Found {len(all_elements)} elements with classes on page")
-                if len(all_elements) < 50:  # Very few elements suggests page didn't load properly
-                    print(f"   🚫 Page appears to not have loaded properly")
                 break
 
             page_products = []
             
             for product in product_elements:
                 try:
-                    # Try multiple selectors for product name
-                    name_selectors = [
-                        ".pt__info a",
-                        ".pt__link",
-                        "[data-testid='product-tile-title']",
-                        "h3 a",
-                        ".product-title a"
-                    ]
-                    
-                    name = None
-                    for name_selector in name_selectors:
-                        try:
-                            name_elem = product.find_element(By.CSS_SELECTOR, name_selector)
-                            name = name_elem.text.strip()
-                            if name:
-                                break
-                        except:
-                            continue
+                    # Product name - correct selector from HTML
+                    try:
+                        name_elem = product.find_element(By.CSS_SELECTOR, ".pt__link")
+                        name = name_elem.text.strip()
+                    except:
+                        name = None
                     
                     if not name:
                         continue
                     
-                    # Try multiple selectors for regular price
-                    price_selectors = [
-                        '.pt__cost__retail-price',
-                        '[data-testid="price-retail"]',
-                        '.price',
-                        '.pt__cost .cost'
-                    ]
-                    
-                    price = "N/A"
-                    for price_selector in price_selectors:
-                        try:
-                            price_elem = product.find_element(By.CSS_SELECTOR, price_selector)
-                            price_text = price_elem.text.strip()
-                            price_match = re.search(r'£[\d.]+', price_text)
-                            if price_match:
-                                price = price_match.group()
-                                break
-                        except:
-                            continue
+                    # Regular price - correct selector from HTML
+                    try:
+                        price_elem = product.find_element(By.CSS_SELECTOR, '[data-testid="pt-retail-price"]')
+                        price_text = price_elem.text.strip()
+                        price_match = re.search(r'£[\d.]+', price_text)
+                        price = price_match.group() if price_match else "N/A"
+                    except:
+                        price = "N/A"
 
-                    # Try multiple selectors for nectar price
-                    nectar_selectors = [
-                        '.pt__cost--price',
-                        '[data-testid="price-nectar"]',
-                        '.nectar-price',
-                        '.pt__cost .nectar'
-                    ]
-                    
-                    nectar_price = "N/A"
-                    for nectar_selector in nectar_selectors:
-                        try:
-                            nectar_elem = product.find_element(By.CSS_SELECTOR, nectar_selector)
-                            nectar_text = nectar_elem.text.strip()
-                            nectar_match = re.search(r'£[\d.]+', nectar_text)
-                            if nectar_match:
-                                nectar_price = nectar_match.group()
-                                break
-                        except:
-                            continue
+                    # Nectar price - correct selector from HTML
+                    try:
+                        nectar_elem = product.find_element(By.CSS_SELECTOR, '[data-testid="contextual-price-text"]')
+                        nectar_text = nectar_elem.text.strip()
+                        nectar_match = re.search(r'£[\d.]+', nectar_text)
+                        nectar_price = nectar_match.group() if nectar_match else "N/A"
+                    except:
+                        nectar_price = "N/A"
 
                     if name and price != "N/A":
                         product_data = {
