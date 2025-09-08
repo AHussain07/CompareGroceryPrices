@@ -3,7 +3,7 @@ name: Tesco Price Scraper
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 14 * * 1'  # Mondays at 14:00 UTC
+    - cron: '0 14 * * 1'  # Mondays at 2 PM UTC
 
 permissions:
   contents: write
@@ -11,217 +11,231 @@ permissions:
 jobs:
   scrape-tesco:
     runs-on: ubuntu-latest
-    timeout-minutes: 120  # Increased for thorough processing
-
+    timeout-minutes: 120
+    
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         fetch-depth: 0
-
+    
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-
+    
     - name: Install system dependencies
       run: |
-        sudo apt-get clean
-        sudo apt-get update --fix-missing
-        sudo apt-get install -y --fix-broken wget curl unzip xvfb
-        sudo apt-get install -y --no-install-recommends libnss3-dev libatk-bridge2.0-0 libdrm2 libxkbcommon0 libgtk-3-0 libatspi2.0-0
+        sudo apt-get update
+        sudo apt-get install -y wget curl unzip xvfb
+        sudo apt-get install -y libnss3-dev libatk-bridge2.0-0 libdrm2 libxkbcommon0 libgtk-3-0 libatspi2.0-0
         sudo apt-get install -y libasound2t64 libxrandr2 libpangocairo-1.0-0 libatk1.0-0 libcairo-gobject2 libgdk-pixbuf2.0-0
-
+    
     - name: Install Chrome (stable version)
       run: |
         wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
         echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
         sudo apt-get update
         sudo apt-get install -y google-chrome-stable
+        
+        # Get exact Chrome version
         CHROME_VERSION=$(google-chrome --version)
         echo "Installed Chrome version: $CHROME_VERSION"
-
+    
+    - name: Install matching ChromeDriver
+      run: |
+        # Get Chrome major version
+        CHROME_MAJOR=$(google-chrome --version | sed 's/Google Chrome //' | cut -d'.' -f1)
+        echo "Chrome major version: $CHROME_MAJOR"
+        
+        # Use Chrome for Testing API
+        echo "Getting ChromeDriver for Chrome $CHROME_MAJOR"
+        LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE")
+        echo "Using ChromeDriver version: $LATEST_VERSION"
+        
+        # Download and install ChromeDriver
+        wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$LATEST_VERSION/linux64/chromedriver-linux64.zip"
+        sudo unzip /tmp/chromedriver.zip -d /tmp/
+        sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
+        sudo chmod +x /usr/local/bin/chromedriver
+        
+        # Verify installation
+        chromedriver --version
+        echo "ChromeDriver installed successfully"
+    
     - name: Install Python dependencies
       run: |
         cd WebScrape
         pip install --upgrade pip
-        pip install pandas selenium undetected-chromedriver psutil
-
+        pip install pandas selenium undetected-chromedriver
+        
+        echo "Installed packages:"
+        pip list | grep -E "(selenium|pandas|undetected)"
+    
     - name: Create public directory
       run: mkdir -p app/public
-
-    - name: Clean ChromeDriver cache
-      run: |
-        rm -rf ~/.cache/undetected_chromedriver 2>/dev/null || true
-        rm -rf ~/appdata/roaming/undetected_chromedriver 2>/dev/null || true
-        rm -rf ~/.local/share/undetected_chromedriver 2>/dev/null || true
-
-    - name: Run Tesco scraper
-      timeout-minutes: 110
+    
+    - name: Run Tesco scraper (unchanged)
+      timeout-minutes: 115
       run: |
         cd WebScrape
+        echo "🛒 Starting Tesco scraper..."
+        echo "📋 Mode: Using original tesco.py (no modifications)"
+        echo "🔧 Sequential processing (max_workers = 1)"
+        echo "📄 All categories included"
+        echo "🕐 Started: $(date)"
+        
+        # Set display for virtual framebuffer
         export DISPLAY=:99
+        
+        # Start virtual display
         Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
         sleep 5
-        echo "🛒 Starting Tesco scraper..."
-        echo "🏪 Store: Tesco"
-        echo "👤 Workers: Sequential processing"
-        echo "📄 Pages: Full pagination per category"
-        echo "🕐 Started: $(date)"
-        echo "📊 Categories: 7 hardcoded categories"
-        echo ""
         
-        # Run with timeout and detailed logging
-        timeout 6600 python tesco.py 2>&1 | tee tesco.log
+        # Run the original tesco.py script without modifications
+        echo "Executing: python tesco.py"
+        timeout 6900 python tesco.py 2>&1 | tee tesco.log
         
-        echo ""
-        echo "✅ Tesco scraper completed at: $(date)"
-
+        echo "Tesco scraper completed at: $(date)"
+    
     - name: Check results and copy CSV
       id: results
       run: |
         cd WebScrape
-        echo "🔍 Checking for output files..."
-        ls -la *.csv 2>/dev/null || echo "No CSV files found in WebScrape directory"
+        
+        echo "Checking for output files..."
+        ls -la *.csv 2>/dev/null || echo "No CSV files found"
         
         if [ -f "tesco.csv" ]; then
-          echo "✅ Found tesco.csv in WebScrape directory"
+          echo "✅ Found tesco.csv"
           
-          # Validate CSV content
+          # Copy to public directory
+          cp tesco.csv ../app/public/
+          echo "✅ Copied to app/public/"
+          
+          # Get detailed stats
           total_lines=$(wc -l < tesco.csv)
-          if [ $total_lines -gt 1 ]; then
-            product_count=$((total_lines - 1))
-            file_size=$(ls -lh tesco.csv | awk '{print $5}')
-            
-            # Copy to app/public
-            cp tesco.csv ../app/public/
-            echo "✅ Copied tesco.csv to app/public/"
-            
-            echo "📊 Results Summary:"
-            echo "- Products found: $product_count"
-            echo "- File size: $file_size"
-            echo "- Total lines: $total_lines"
-            
-            # Set success outputs
+          product_count=$((total_lines - 1))
+          file_size=$(ls -lh tesco.csv | awk '{print $5}')
+          
+          echo "📊 Results:"
+          echo "- Products: $product_count"
+          echo "- File size: $file_size"
+          echo "- Total lines: $total_lines"
+          
+          # Check if we actually got products
+          if [ $product_count -gt 0 ]; then
             echo "success=true" >> $GITHUB_OUTPUT
             echo "product_count=$product_count" >> $GITHUB_OUTPUT
             
+            # Show sample products
             echo ""
             echo "📋 Sample products (first 5):"
-            head -6 tesco.csv | tail -5 || echo "Could not display sample"
+            head -6 tesco.csv | tail -5
             
+            # Show category breakdown
             echo ""
-            echo "📊 Categories breakdown:"
-            tail -n +2 tesco.csv | cut -d',' -f1 | sort | uniq -c | sort -nr | head -10 || echo "Could not analyze categories"
+            echo "📊 Categories with products:"
+            tail -n +2 tesco.csv | cut -d',' -f1 | sort | uniq -c | sort -nr | head -10
             
+            # Show performance stats from log
             echo ""
-            echo "📈 Performance stats from log:"
-            grep -E "Total products:|Total time:|Products per second:|SCRAPING COMPLETED" tesco.log | tail -5 || echo "No performance stats found"
+            echo "📊 Performance stats:"
+            grep -E "Total products:|Total time:|Products per second:|SCRAPING COMPLETED" tesco.log | tail -3
             
           else
-            echo "⚠️ tesco.csv exists but appears empty (only header)"
+            echo "❌ CSV file created but contains 0 products"
             echo "success=false" >> $GITHUB_OUTPUT
             echo "product_count=0" >> $GITHUB_OUTPUT
           fi
           
         else
-          echo "❌ No tesco.csv found in WebScrape directory"
+          echo "❌ No tesco.csv found"
           echo ""
-          echo "📂 Directory contents:"
+          echo "📋 Directory contents:"
           ls -la
           echo ""
-          echo "📄 Checking for any CSV files:"
-          find . -name "*.csv" -type f 2>/dev/null || echo "No CSV files found anywhere"
-          echo ""
-          echo "📋 Last 50 lines of log for debugging:"
-          tail -50 tesco.log 2>/dev/null || echo "No log file found"
-          echo ""
-          echo "🔍 Checking for common error patterns:"
-          grep -i "error\|failed\|exception\|timeout" tesco.log | tail -10 2>/dev/null || echo "No obvious errors found in log"
+          echo "📋 Last 50 lines of log:"
+          tail -50 tesco.log 2>/dev/null || echo "No log file"
           
           echo "success=false" >> $GITHUB_OUTPUT
           echo "product_count=0" >> $GITHUB_OUTPUT
         fi
-
-    - name: Upload logs and debug files
+    
+    - name: Upload logs and backup
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: tesco-scraper-logs
+        name: tesco-original-logs
         path: |
           WebScrape/tesco.log
+          WebScrape/tesco.py
           WebScrape/debug_*.html
-          WebScrape/*.csv
         retention-days: 7
         if-no-files-found: ignore
-
+    
     - name: Commit changes if successful
-      if: steps.results.outputs.success == 'true'
+      if: steps.results.outputs.success == 'true' && steps.results.outputs.product_count > 0
       run: |
         git config --global user.email "actions@github.com"
-        git config --global user.name "GitHub Actions - Tesco Scraper"
+        git config --global user.name "GitHub Actions - Tesco Original"
         
-        # Add the CSV file
+        # Add CSV file
         git add -f app/public/tesco.csv
         
-        # Check if there are changes to commit
         if ! git diff --staged --quiet; then
-          echo "📝 Committing new Tesco data..."
-          git commit -m "🛒 Tesco price update - $(date -u '+%Y-%m-%d %H:%M UTC')
+          echo "📝 Committing changes..."
+          
+          git commit -m "🛒 Tesco price update (Original Script) - $(date -u '+%Y-%m-%d %H:%M UTC')
 
-          📊 Products: ${{ steps.results.outputs.product_count }}
-          🏪 Store: Tesco (7 categories)
-          🔄 Processing: Sequential with enhanced selectors
-          📄 Method: Full pagination scraping
-          ⏱️ Runtime: ~2 hours maximum
-
-          Features implemented:
-          ✅ Dynamic Chrome version detection
-          ✅ Enhanced product selector strategies  
-          ✅ Comprehensive pagination handling
-          ✅ Robust error handling and fallbacks
-          ✅ Debug HTML generation for troubleshooting
-          ✅ Cross-platform compatibility (Windows/Linux)
-
+          Products: ${{ steps.results.outputs.product_count }}
+          Store: Tesco
+          Script: Original tesco.py (unmodified)
+          Processing: Sequential (max_workers = 1)
+          Categories: All included
+          
+          Features:
+          - Undetected ChromeDriver with version detection
+          - Multiple selector fallback strategies
+          - Enhanced pagination detection
+          - Debug HTML generation for troubleshooting
+          - Cross-platform Chrome version detection
+          
           Auto-updated via GitHub Actions"
           
           git push origin HEAD:${{ github.ref_name }}
-          echo "✅ Successfully pushed updated tesco.csv to repository"
+          echo "✅ Changes pushed successfully"
         else
-          echo "ℹ️ No changes detected in tesco.csv - nothing to commit"
+          echo "ℹ️ No changes to commit"
         fi
-
-    - name: Generate summary
+    
+    - name: Summary
       if: always()
       run: |
-        echo "## 🛒 Tesco Scraper Summary" >> $GITHUB_STEP_SUMMARY
-        echo "**Execution completed:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+        echo "## 🛒 Tesco Scraper Summary (Original)" >> $GITHUB_STEP_SUMMARY
+        echo "**Run completed:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
         if [ "${{ steps.results.outputs.success }}" == "true" ]; then
-          echo "### ✅ Scraping Successful" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Success" >> $GITHUB_STEP_SUMMARY
           echo "- **Products scraped:** ${{ steps.results.outputs.product_count }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Categories:** 7 (fresh-food, bakery, frozen-food, treats-and-snacks, food-cupboard, drinks, baby-and-toddler)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Processing:** Sequential (1 worker thread)" >> $GITHUB_STEP_SUMMARY
-          echo "- **File status:** Committed to repository ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- **Location:** \`app/public/tesco.csv\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Script:** Original tesco.py (unmodified)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Processing:** Sequential (max_workers = 1)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** Data committed to repository" >> $GITHUB_STEP_SUMMARY
         else
           echo "### ❌ Scraping Failed" >> $GITHUB_STEP_SUMMARY
-          echo "- **Error:** Failed to generate valid CSV data" >> $GITHUB_STEP_SUMMARY
-          echo "- **Categories attempted:** 7" >> $GITHUB_STEP_SUMMARY
-          echo "- **Processing method:** Sequential with enhanced selectors" >> $GITHUB_STEP_SUMMARY
-          echo "- **Debug files:** Check uploaded artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "- **Logs:** Available in artifacts for 7 days" >> $GITHUB_STEP_SUMMARY
+          echo "- **Error:** Failed to generate usable CSV file" >> $GITHUB_STEP_SUMMARY
+          echo "- **Script:** Original tesco.py attempted" >> $GITHUB_STEP_SUMMARY
+          echo "- **Logs:** Check uploaded artifacts for details" >> $GITHUB_STEP_SUMMARY
         fi
         
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 🔧 Technical Configuration" >> $GITHUB_STEP_SUMMARY
-        echo "- **Browser:** Undetected Chrome (headless)" >> $GITHUB_STEP_SUMMARY
-        echo "- **Driver management:** Dynamic version detection + enhanced cleanup" >> $GITHUB_STEP_SUMMARY
-        echo "- **Selectors:** Multiple fallback strategies for product detection" >> $GITHUB_STEP_SUMMARY
-        echo "- **Pagination:** Full page traversal with robust detection" >> $GITHUB_STEP_SUMMARY
-        echo "- **Error handling:** Comprehensive with debug HTML generation" >> $GITHUB_STEP_SUMMARY
-        echo "- **Platform:** Ubuntu Latest (GitHub Actions)" >> $GITHUB_STEP_SUMMARY
-        echo "- **Timeout:** 2 hours total runtime limit" >> $GITHUB_STEP_SUMMARY
-        echo "- **Schedule:** Mondays at 14:00 UTC + manual trigger" >> $GITHUB_STEP_SUMMARY
+        echo "### 📋 Technical Details" >> $GITHUB_STEP_SUMMARY
+        echo "- **Driver:** Undetected ChromeDriver" >> $GITHUB_STEP_SUMMARY
+        echo "- **Mode:** Headless (GitHub Actions)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Processing:** Sequential with ThreadPoolExecutor(max_workers=1)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Categories:** 7 categories (fresh-food, bakery, frozen-food, treats-and-snacks, food-cupboard, drinks, baby-and-toddler)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Modifications:** None - using original file" >> $GITHUB_STEP_SUMMARY
+        echo "- **Timeout:** 2 hours total" >> $GITHUB_STEP_SUMMARY
+        echo "- **Debug:** HTML files saved for troubleshooting" >> $GITHUB_STEP_SUMMARY
