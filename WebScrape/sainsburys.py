@@ -1,16 +1,25 @@
+import time
+import random
+import csv
+import os
+import re
+import shutil
+import subprocess
+import psutil
+from datetime import datetime
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import pandas as pd
-import time
-import threading
 
-# Thread-safe storage
-products_lock = threading.Lock()
-all_products = []
-cookies_handled = threading.Event()
+# === Patch uc.Chrome destructor to prevent WinError 6 warnings ===
+uc.Chrome.__del__ = lambda self: None
+
+
+# ========== SCRAPER CONFIG ==========
+MAX_THREADS = 1  # Reduced to 1 for better stability with ChromeDriver issues
+BASE_URL = "https://www.sainsburys.co.uk"
 
 CATEGORY_URLS = [
     "https://www.sainsburys.co.uk/gol-ui/groceries/frozen/chips-potatoes-and-rice/c:1019895",
@@ -125,221 +134,437 @@ CATEGORY_URLS = [
     "https://www.sainsburys.co.uk/gol-ui/groceries/meat-and-fish/turkey/c:1054773"
 ]
 
-def setup_optimized_driver():
-    """Setup optimized Chrome driver"""
-    options = uc.ChromeOptions()
-    # Performance optimizations
-    options.add_argument('--disable-images')
-    options.add_argument('--disable-plugins')
-    options.add_argument('--disable-extensions')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-gpu')
-    options.add_argument('--disable-web-security')
-    options.add_argument('--disable-background-timer-throttling')
-    options.add_argument('--disable-renderer-backgrounding')
-    options.add_argument('--disable-backgrounding-occluded-windows')
-    options.add_argument('--disable-blink-features=AutomationControlled')
-    
+
+
+OUTPUT_FILE = "sainsburys.csv"
+APP_OUTPUT_FILE = "../app/public/sainsburys.csv"
+
+# ====================================
+
+
+def kill_chrome_processes():
+    """Kill all Chrome and ChromeDriver processes"""
     try:
-        driver = uc.Chrome(options=options)
+        for proc in psutil.process_iter(['pid', 'name']):
+            try:
+                if any(name in proc.info['name'].lower() for name in ['chrome', 'chromedriver']):
+                    proc.kill()
+                    print(f"Killed process: {proc.info['name']} (PID: {proc.info['pid']})")
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+        time.sleep(1)  # Wait for processes to terminate
+    except Exception as e:
+        print(f"Error killing processes: {e}")
+
+
+def get_chrome_version():
+    """Get installed Chrome version on Windows"""
+    try:
+        # Try registry method first
+        try:
+            result = subprocess.run([
+                'reg', 'query', 'HKEY_CURRENT_USER\\Software\\Google\\Chrome\\BLBeacon', '/v', 'version'
+            ], capture_output=True, text=True, timeout=10)
+            
+            if result.returncode == 0:
+                version_match = re.search(r'(\d+)\.(\d+)\.(\d+)\.(\d+)', result.stdout)
+                if version_match:
+                    full_version = version_match.group(0)
+                    major_version = int(version_match.group(1))
+                    print(f"Detected Chrome version: {full_version} (major: {major_version})")
+                    return major_version
+        except:
+            pass
+        
+        # Try PowerShell method
+        try:
+            result = subprocess.run([
+                'powershell', '-command', 
+                '(Get-Item "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe").VersionInfo.ProductVersion'
+            ], capture_output=True, text=True, timeout=10)
+            
+            if result.returncode == 0:
+                version_match = re.search(r'(\d+)\.(\d+)\.(\d+)\.(\d+)', result.stdout)
+                if version_match:
+                    full_version = version_match.group(0)
+                    major_version = int(version_match.group(1))
+                    print(f"Detected Chrome version: {full_version} (major: {major_version})")
+                    return major_version
+        except:
+            pass
+        
+        print("Could not detect Chrome version - will use auto-detection")
+        return None
+        
+    except Exception as e:
+        print(f"Error detecting Chrome version: {e}")
+        return None
+
+
+def cleanup_chromedriver_files():
+    """Comprehensive cleanup of ChromeDriver files"""
+    try:
+        print("🧹 Starting comprehensive ChromeDriver cleanup...")
+        
+        # Kill all Chrome processes first
+        kill_chrome_processes()
+        
+        # Clean up undetected_chromedriver directory
+        cleanup_paths = [
+            os.path.join(os.path.expanduser("~"), "appdata", "roaming", "undetected_chromedriver"),
+            os.path.join(os.path.expanduser("~"), "AppData", "Roaming", "undetected_chromedriver"),
+            os.path.join(os.path.expanduser("~"), ".cache", "undetected_chromedriver"),
+            os.path.join(os.getcwd(), "chromedriver.exe"),
+            os.path.join(os.getcwd(), "chromedriver"),
+        ]
+        
+        for path in cleanup_paths:
+            if os.path.exists(path):
+                try:
+                    if os.path.isfile(path):
+                        os.remove(path)
+                        print(f"   ✅ Removed file: {path}")
+                    else:
+                        shutil.rmtree(path)
+                        print(f"   ✅ Removed directory: {path}")
+                except Exception as e:
+                    print(f"   ⚠️ Could not remove {path}: {e}")
+        
+        print("✅ ChromeDriver cleanup completed")
+        time.sleep(1)  # Wait for cleanup
+        
+    except Exception as e:
+        print(f"Error during cleanup: {e}")
+
+
+def setup_optimized_driver():
+    """Setup optimized Chrome driver with proper version handling"""
+    # Clean up any existing conflicting files first
+    cleanup_chromedriver_files()
+    
+    # Get Chrome version
+    chrome_version = get_chrome_version()
+    
+    options = uc.ChromeOptions()
+    prefs = {"profile.managed_default_content_settings.images": 2}  # disable images
+    options.add_experimental_option("prefs", prefs)
+
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--start-maximized")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--headless")
+    options.add_argument("--disable-web-security")
+    options.add_argument("--allow-running-insecure-content")
+    options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36")
+
+    try:
+        # Try with detected Chrome version first
+        if chrome_version:
+            print(f"Attempting to create driver with Chrome version {chrome_version}")
+            try:
+                driver = uc.Chrome(version_main=chrome_version, options=options)
+                driver.delete_all_cookies()
+                print("✅ Driver created successfully with detected version")
+                return driver
+            except Exception as e:
+                print(f"Failed with detected version {chrome_version}: {e}")
+        
+        # Fallback: Let undetected-chromedriver auto-detect
+        print("Attempting auto-detection fallback...")
+        driver = uc.Chrome(version_main=None, options=options)
+        driver.delete_all_cookies()
+        print("✅ Driver created successfully with auto-detection")
         return driver
+        
     except Exception as e:
         print(f"Failed to create driver: {e}")
         return None
 
-def handle_cookies_once(driver):
-    """Handle cookies only once globally"""
-    if not cookies_handled.is_set():
-        try:
-            WebDriverWait(driver, 3).until(
-                EC.element_to_be_clickable((By.XPATH, '//button[contains(.,"Accept All Cookies") or contains(.,"Accept all cookies")]'))
-            ).click()
-            print("✓ Cookies accepted")
-            cookies_handled.set()
-            time.sleep(0.5)  # Brief pause after cookie acceptance
-        except Exception:
-            cookies_handled.set()  # Set even if not found to avoid repeated attempts
 
-def scrape_single_category(base_url):
-    """Scrape a single category with optimizations and improved page handling"""
-    driver = None
+def check_pagination_and_duplicates(driver, current_page_products, all_seen_products):
+    """Check pagination status and detect duplicate content"""
+    
+    # First, check for duplicate products (indicates we've hit the end)
+    current_product_names = {p["Product Name"] for p in current_page_products}
+    overlap = current_product_names.intersection(all_seen_products)
+    
+    if len(overlap) > len(current_product_names) * 0.5:  # More than 50% overlap
+        print(f"   🔄 Detected {len(overlap)} duplicate products - likely reached end")
+        return True
+    
+    # Check URL for actual page number
     try:
-        driver = setup_optimized_driver()
-        if not driver:
-            return []
-            
-        category_products = []
-        seen = set()
-        seen_product_count = 0
-        last_product_count = 0
+        current_url = driver.current_url
+        if "page=" in current_url:
+            page_match = re.search(r'page=(\d+)', current_url)
+            if page_match:
+                current_page_num = int(page_match.group(1))
+                print(f"   📍 Current URL page: {current_page_num}")
+    except:
+        pass
+    
+    # Check for disabled next button
+    try:
+        disabled_selectors = [
+            'button[rel="next"].ln-c-pagination__link.is-disabled',
+            'button[rel="next"][disabled]',
+            'button[rel="next"][aria-disabled="true"]',
+            '.ln-c-pagination__link[rel="next"].is-disabled',
+            '.ln-c-pagination__link[rel="next"][aria-disabled="true"]'
+        ]
         
-        # Extract category name properly from URL - use the last meaningful part
-        url_parts = base_url.split('/')
-        # Get the part before the category ID (c:xxxxx)
-        for i, part in enumerate(url_parts):
-            if part.startswith('c:'):
-                if i > 0:
-                    category_name = url_parts[i-1]
+        for selector in disabled_selectors:
+            try:
+                disabled_button = driver.find_element(By.CSS_SELECTOR, selector)
+                if disabled_button:
+                    print("   ✅ Next button is disabled - reached last page")
+                    return True
+            except:
+                continue
+        
+        # Check for enabled next button
+        enabled_selectors = [
+            'button[rel="next"]:not(.is-disabled):not([disabled]):not([aria-disabled="true"])',
+            '.ln-c-pagination__link[rel="next"]:not(.is-disabled):not([disabled]):not([aria-disabled="true"])'
+        ]
+        
+        has_enabled_next = False
+        for selector in enabled_selectors:
+            try:
+                enabled_button = driver.find_element(By.CSS_SELECTOR, selector)
+                if enabled_button and enabled_button.is_enabled():
+                    has_enabled_next = True
                     break
+            except:
+                continue
+        
+        if not has_enabled_next:
+            print("   ✅ No enabled next button found - reached last page")
+            return True
         else:
-            # Fallback to last part of path
-            category_name = url_parts[-1] if url_parts[-1] else "unknown"
-        
-        print(f"Starting: {category_name}")
-        
-        page_num = 1
-        max_duplicate_pages = 3  # Maximum pages with same product count
-        duplicate_page_count = 0
-        max_pages = 30  # Hard limit on maximum pages to prevent infinite loops
-        
-        while page_num <= max_pages and duplicate_page_count < max_duplicate_pages:
-            # Build URL
-            if page_num == 1:
-                url = base_url
-            else:
-                url = f"{base_url}/opt/page:{page_num}"
-            
-            print(f"{category_name}: Trying page {page_num}")
-            driver.get(url)
-            
-            # Handle cookies only once per session
-            if page_num == 1:
-                handle_cookies_once(driver)
-            
-            # Quick check for end conditions
-            try:
-                if "404" in driver.title.lower() or "error" in driver.title.lower():
-                    print(f"{category_name}: Error page detected on page {page_num}")
-                    break
-            except Exception:
-                pass
+            print("   ➡️ Next button is enabled - checking for actual new content")
+    
+    except Exception as e:
+        print(f"   ⚠️ Error checking pagination: {e}")
+        return True  # Assume last page on error
+    
+    return False
 
-            # Wait for and get products
-            try:
-                WebDriverWait(driver, 3).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, ".pt__content"))
-                )
-                products = driver.find_elements(By.CSS_SELECTOR, ".pt__content")
-            except Exception:
-                print(f"{category_name}: No products found on page {page_num}")
+
+def scrape_category(driver, url):
+    """Scrape all pages from a category with improved pagination and duplicate detection"""
+    products = []
+    page = 1
+    all_seen_product_names = set()
+    consecutive_duplicate_pages = 0
+    max_pages = 20  # Safety limit
+
+    # Extract category name from URL
+    # Extract category name - get the last meaningful part before the ID
+    url_parts = url.rstrip('/').split('/')
+    # Find the part just before the category ID (c:xxxxx)
+    for i, part in enumerate(url_parts):
+        if part.startswith('c:'):
+            if i > 0:
+                category_name = url_parts[i-1]
                 break
+    else:
+        # Fallback to groceries section
+        try:
+            category_name = url.split('/groceries/')[1].split('/')[0]
+        except:
+            category_name = "unknown"
+
+    print(f"🛒 Starting category: {category_name}")
+
+    while page <= max_pages:
+        try:
+            paged_url = f"{url}?page={page}"
+            print(f"   📄 Scraping page {page}...")
             
-            # Track product counts to detect duplicates
-            last_product_count = seen_product_count
-            new_products_count = 0
+            driver.get(paged_url)
+            time.sleep(random.uniform(1.0, 2.0))
+
+            # Wait for products to load
+            try:
+                WebDriverWait(driver, 20).until(
+                    EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".pt__content"))
+                )
+            except:
+                print(f"   ⚠️ No products found on page {page}")
+                break
+
+            product_elements = driver.find_elements(By.CSS_SELECTOR, ".pt__content")
+            if not product_elements:
+                print(f"   ⚠️ No product elements found on page {page}")
+                break
+
+            page_products = []
+            page_products_count = 0
             
-            # Process products
-            for product in products:
+            for product in product_elements:
                 try:
-                    name_elem = product.find_element(By.CSS_SELECTOR, '.pt__link')
-                    name = name_elem.text.strip()
+                    name = product.find_element(By.CSS_SELECTOR, ".pt__info a").text.strip()
                     
-                    if not name:
-                        continue
-                    
-                    # Extract price - return to simple format like before
-                    price_elem = product.find_element(By.CSS_SELECTOR, '.pt__cost__retail-price')
-                    price = price_elem.text.strip()
-                    
-                    # Extract Nectar price - simple approach
+                    # Extract regular price and nectar price separately
                     try:
+                        # Try to get regular price first
+                        regular_price_elem = product.find_element(By.CSS_SELECTOR, '.pt__cost__retail-price')
+                        price = regular_price_elem.text.strip()
+                        # Clean the price - extract just the £X.XX part
+                        price_match = re.search(r'£[\d.]+', price)
+                        price = price_match.group() if price_match else price.split()[0] if price else "N/A"
+                    except:
+                        price = "N/A"
+
+                    try:
+                        # Try to get nectar price
                         nectar_elem = product.find_element(By.CSS_SELECTOR, '.pt__cost--price')
-                        nectar_price = nectar_elem.text.strip()
-                    except Exception:
-                        nectar_price = 'N/A'
-                    
-                    # Check for duplicates
-                    key = (name, category_name)
-                    if key not in seen:
-                        category_products.append({
+                        nectar_text = nectar_elem.text.strip()
+                        # Extract the nectar price (usually the first £X.XX in the nectar element)
+                        nectar_match = re.search(r'£[\d.]+', nectar_text)
+                        nectar_price = nectar_match.group() if nectar_match else "N/A"
+                    except:
+                        nectar_price = "N/A"
+
+                    if name and price:
+                        product_data = {
                             "Category": category_name,
                             "Product Name": name,
                             "Price": price,
                             "Price with Nectar": nectar_price
-                        })
-                        seen.add(key)
-                        new_products_count += 1
-                        
+                        }
+                        page_products.append(product_data)
+                        page_products_count += 1
                 except Exception:
                     continue
+
+            print(f"   ✅ Found {page_products_count} products on page {page}")
+
+            # Check for duplicates and pagination
+            if check_pagination_and_duplicates(driver, page_products, all_seen_product_names):
+                print(f"   🏁 Reached last page for {category_name}")
+                break
+
+            # Add new products only (no duplicates)
+            new_products = []
+            for product in page_products:
+                if product["Product Name"] not in all_seen_product_names:
+                    new_products.append(product)
+                    all_seen_product_names.add(product["Product Name"])
+
+            products.extend(new_products)
             
-            seen_product_count = len(seen)
-            print(f"{category_name}: Page {page_num} - {new_products_count} new products")
-            
-            # Check if we found any new products
-            if seen_product_count == last_product_count:
-                duplicate_page_count += 1
-                print(f"{category_name}: No new products (duplicate page {duplicate_page_count}/{max_duplicate_pages})")
+            if len(new_products) == 0:
+                consecutive_duplicate_pages += 1
+                print(f"   ⚠️ No new products on page {page} (consecutive: {consecutive_duplicate_pages})")
+                if consecutive_duplicate_pages >= 2:
+                    print(f"   🛑 Stopping due to {consecutive_duplicate_pages} consecutive pages with no new products")
+                    break
             else:
-                duplicate_page_count = 0
-            
-            page_num += 1
-            time.sleep(0.3)
-        
-        print(f"{category_name}: Completed - {len(category_products)} total unique products")
-        return category_products
-        
-    except Exception as e:
-        print(f"Error in {category_name}: {e}")
+                consecutive_duplicate_pages = 0
+                print(f"   ➕ Added {len(new_products)} new products")
+
+            page += 1
+            time.sleep(random.uniform(1.0, 2.0))
+
+        except Exception as e:
+            print(f"   ❌ Error on page {page}: {e}")
+            break
+
+    print(f"✅ Category {category_name} completed: {len(products)} total unique products\n")
+    return products
+
+
+def scrape_single_category(url):
+    """Run one thread for a category"""
+    driver = setup_optimized_driver()
+    if not driver:
+        print(f"❌ Failed to create driver for {url}")
         return []
+
+    try:
+        products = scrape_category(driver, url)
+        return products
     finally:
         try:
-            if driver:
-                driver.close()  # Close the window first
-                driver.quit()   # Then quit the driver
-        except Exception:
-            pass  # Suppress cleanup errors
-
-def scrape_sainsburys_optimized():
-    """Main function with parallel processing"""
-    print("Starting optimized Sainsbury's scraper...")
-    start_time = time.time()
-    
-    # Reduce max_workers to avoid too many browser instances
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        # Submit all category tasks
-        future_to_url = {
-            executor.submit(scrape_single_category, url): url 
-            for url in CATEGORY_URLS
-        }
-        
-        # Collect results
-        for future in as_completed(future_to_url):
-            url = future_to_url[future]
-            try:
-                category_products = future.result()
-                
-                # Thread-safe addition
-                with products_lock:
-                    all_products.extend(category_products)
-                    
-            except Exception as e:
-                print(f"Category failed {url}: {e}")
-    
-    # Save results
-    if all_products:
-        df = pd.DataFrame(all_products)
-        df.to_csv("sainsburys.csv", index=False)
-        
-        # Also save to app folder if it exists
-        try:
-            df.to_csv("../app/public/sainsburys.csv", index=False)
-        except Exception:
+            driver.quit()
+        except:
             pass
+        # Clean up after each category
+        time.sleep(1)
+
+
+def scrape_all_categories():
+    """Scrape all categories sequentially for better stability"""
+    all_products = []
+    
+    # Use sequential processing instead of threading for better stability
+    for i, url in enumerate(CATEGORY_URLS, 1):
+        print(f"\n📊 Progress: Starting {i}/{len(CATEGORY_URLS)} categories")
+        try:
+            products = scrape_single_category(url)
+            all_products.extend(products)
+            print(f"📊 Progress: {i}/{len(CATEGORY_URLS)} categories completed")
+        except Exception as e:
+            print(f"❌ Error scraping category {url}: {e}")
         
-        end_time = time.time()
-        duration = end_time - start_time
-        
-        print(f"\n{'='*50}")
-        print(f"SCRAPING COMPLETED!")
-        print(f"Total products: {len(all_products)}")
-        print(f"Total time: {duration:.2f} seconds")
-        print(f"Products per second: {len(all_products)/duration:.2f}")
-        print(f"File saved: sainsburys.csv")
-        print(f"{'='*50}")
-    else:
-        print("No products found.")
+        # Wait between categories to avoid issues
+        if i < len(CATEGORY_URLS):
+            time.sleep(1)
+
+    return all_products
+
+
+def save_products(products):
+    """Save scraped data to CSV files"""
+    if not products:
+        print("❌ No products found.")
+        return
+
+    fieldnames = ["Category", "Product Name", "Price", "Price with Nectar"]
+
+    # Save locally
+    with open(OUTPUT_FILE, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(products)
+
+    # Save to app/public folder
+    os.makedirs(os.path.dirname(APP_OUTPUT_FILE), exist_ok=True)
+    with open(APP_OUTPUT_FILE, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(products)
+
+    print(f"✅ Files saved: {OUTPUT_FILE} (local) and {APP_OUTPUT_FILE}")
+
+
+def main():
+    print("🛒 Starting optimized Sainsbury's scraper...")
+    print(f"📋 Categories to scrape: {len(CATEGORY_URLS)}")
+    print(f"🧵 Processing: Sequential (no threading)")
+    print(f"🔧 ChromeDriver: Enhanced cleanup and version detection")
+    print(f"📄 Pagination: Duplicate detection + disabled Next button")
+    print(f"🛑 Safety: Max 20 pages per category\n")
+
+    start_time = time.time()
+    products = scrape_all_categories()
+    elapsed = time.time() - start_time
+
+    save_products(products)
+
+    print("\n" + "="*60)
+    print("🎉 SCRAPING COMPLETED!")
+    print(f"📊 Total products: {len(products)}")
+    print(f"⏱️ Total time: {elapsed:.2f} seconds")
+    if products:
+        print(f"🚀 Products per second: {len(products)/elapsed:.2f}")
+    print("="*60)
+
 
 if __name__ == "__main__":
-    scrape_sainsburys_optimized()
+    main()
