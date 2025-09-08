@@ -287,11 +287,12 @@ def setup_optimized_driver():
 def check_pagination_and_duplicates(driver, current_page_products, all_seen_products):
     """Check pagination status and detect duplicate content"""
     
-    # First, check for duplicate products (indicates we've hit the end)
+    # Check for duplicate products (indicates we've hit the end)
     current_product_names = {p["Product Name"] for p in current_page_products}
     overlap = current_product_names.intersection(all_seen_products)
     
-    if len(overlap) > len(current_product_names) * 0.5:  # More than 50% overlap
+    # Only stop if we have a very high overlap (90%+) indicating true duplicates
+    if len(overlap) > len(current_product_names) * 0.9:  # More than 90% overlap
         print(f"   🔄 Detected {len(overlap)} duplicate products - likely reached end")
         return True
     
@@ -360,7 +361,7 @@ def scrape_category(driver, url):
     page = 1
     all_seen_product_names = set()
     consecutive_duplicate_pages = 0
-    max_pages = 20  # Safety limit
+    max_pages = 50  # Increased safety limit for larger categories
 
     # Extract category name from URL
     # Extract category name - get the last meaningful part before the ID
@@ -382,7 +383,10 @@ def scrape_category(driver, url):
 
     while page <= max_pages:
         try:
-            paged_url = f"{url}?page={page}"
+            if page == 1:
+                paged_url = url
+            else:
+                paged_url = f"{url}/opt/page:{page}"
             print(f"   📄 Scraping page {page}...")
             
             driver.get(paged_url)
@@ -458,15 +462,17 @@ def scrape_category(driver, url):
 
             products.extend(new_products)
             
-            if len(new_products) == 0:
+            # Check if we found any new products
+            new_products_this_page = len(new_products)
+            if new_products_this_page == 0:
                 consecutive_duplicate_pages += 1
                 print(f"   ⚠️ No new products on page {page} (consecutive: {consecutive_duplicate_pages})")
-                if consecutive_duplicate_pages >= 2:
+                if consecutive_duplicate_pages >= 5:  # Increased tolerance to 5 pages
                     print(f"   🛑 Stopping due to {consecutive_duplicate_pages} consecutive pages with no new products")
                     break
             else:
                 consecutive_duplicate_pages = 0
-                print(f"   ➕ Added {len(new_products)} new products")
+                print(f"   ➕ Added {new_products_this_page} new products")
 
             page += 1
             time.sleep(random.uniform(1.0, 2.0))
@@ -549,7 +555,7 @@ def main():
     print(f"🧵 Processing: Sequential (no threading)")
     print(f"🔧 ChromeDriver: Enhanced cleanup and version detection")
     print(f"📄 Pagination: Duplicate detection + disabled Next button")
-    print(f"🛑 Safety: Max 20 pages per category\n")
+    print(f"🛑 Safety: Max 50 pages per category\n")  # ✅ Match the actual max_pages value
 
     start_time = time.time()
     products = scrape_all_categories()
