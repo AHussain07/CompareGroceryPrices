@@ -6,7 +6,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 import time
 import threading
-import re
 
 # Thread-safe storage
 products_lock = threading.Lock()
@@ -126,37 +125,6 @@ CATEGORY_URLS = [
     "https://www.sainsburys.co.uk/gol-ui/groceries/meat-and-fish/turkey/c:1054773"
 ]
 
-def clean_price(price_text):
-    """Extract and clean price from text"""
-    if not price_text:
-        return "N/A"
-    
-    # Remove extra whitespace
-    price_text = price_text.strip()
-    
-    # Look for price patterns like £1.50, £10.99, etc.
-    price_match = re.search(r'£\d+\.?\d*', price_text)
-    if price_match:
-        return price_match.group(0)
-    
-    return "N/A"
-
-def extract_nectar_price(price_container):
-    """Extract Nectar price if available"""
-    try:
-        # Look for Nectar price indicators
-        nectar_elements = price_container.find_elements(By.CSS_SELECTOR, 
-            '.pt__cost--nectar-price, .nectar-price, [data-test-id*="nectar"], .promotion .price-per-item')
-        
-        for elem in nectar_elements:
-            nectar_text = elem.text.strip()
-            if nectar_text and ('with nectar' in nectar_text.lower() or '£' in nectar_text):
-                return clean_price(nectar_text)
-        
-        return "N/A"
-    except Exception:
-        return "N/A"
-
 def setup_optimized_driver():
     """Setup optimized Chrome driver"""
     options = uc.ChromeOptions()
@@ -189,12 +157,12 @@ def handle_cookies_once(driver):
             ).click()
             print("✓ Cookies accepted")
             cookies_handled.set()
-            time.sleep(0.5)
+            time.sleep(0.5)  # Brief pause after cookie acceptance
         except Exception:
-            cookies_handled.set()
+            cookies_handled.set()  # Set even if not found to avoid repeated attempts
 
 def scrape_single_category(base_url):
-    """Scrape a single category with proper price separation"""
+    """Scrape a single category with optimizations and improved page handling"""
     driver = None
     try:
         driver = setup_optimized_driver()
@@ -206,20 +174,24 @@ def scrape_single_category(base_url):
         seen_product_count = 0
         last_product_count = 0
         
-        # Extract category name from URL
-        try:
-            category_name = base_url.split('/groceries/')[-1].split('/')[0]
-            if len(category_name) > 30:  # If too long, get the last part
-                category_name = base_url.split('/')[-2]
-        except:
-            category_name = "unknown"
-            
+        # Extract category name properly from URL - use the last meaningful part
+        url_parts = base_url.split('/')
+        # Get the part before the category ID (c:xxxxx)
+        for i, part in enumerate(url_parts):
+            if part.startswith('c:'):
+                if i > 0:
+                    category_name = url_parts[i-1]
+                    break
+        else:
+            # Fallback to last part of path
+            category_name = url_parts[-1] if url_parts[-1] else "unknown"
+        
         print(f"Starting: {category_name}")
         
         page_num = 1
-        max_duplicate_pages = 3
+        max_duplicate_pages = 3  # Maximum pages with same product count
         duplicate_page_count = 0
-        max_pages = 30
+        max_pages = 30  # Hard limit on maximum pages to prevent infinite loops
         
         while page_num <= max_pages and duplicate_page_count < max_duplicate_pages:
             # Build URL
@@ -235,7 +207,7 @@ def scrape_single_category(base_url):
             if page_num == 1:
                 handle_cookies_once(driver)
             
-            # Quick check for error pages
+            # Quick check for end conditions
             try:
                 if "404" in driver.title.lower() or "error" in driver.title.lower():
                     print(f"{category_name}: Error page detected on page {page_num}")
@@ -243,7 +215,7 @@ def scrape_single_category(base_url):
             except Exception:
                 pass
 
-            # Wait for products
+            # Wait for and get products
             try:
                 WebDriverWait(driver, 3).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, ".pt__content"))
@@ -253,37 +225,29 @@ def scrape_single_category(base_url):
                 print(f"{category_name}: No products found on page {page_num}")
                 break
             
+            # Track product counts to detect duplicates
             last_product_count = seen_product_count
             new_products_count = 0
             
-            # Process products with improved price extraction
+            # Process products
             for product in products:
                 try:
-                    # Get product name
                     name_elem = product.find_element(By.CSS_SELECTOR, '.pt__link')
                     name = name_elem.text.strip()
                     
                     if not name:
                         continue
                     
-                    # Get price container
-                    price_container = product.find_element(By.CSS_SELECTOR, '.pt__cost')
+                    # Extract price - return to simple format like before
+                    price_elem = product.find_element(By.CSS_SELECTOR, '.pt__cost__retail-price')
+                    price = price_elem.text.strip()
                     
-                    # Extract regular price
+                    # Extract Nectar price - simple approach
                     try:
-                        regular_price_elem = price_container.find_element(By.CSS_SELECTOR, 
-                            '.pt__cost__retail-price, .retail-price, .price')
-                        regular_price = clean_price(regular_price_elem.text)
+                        nectar_elem = product.find_element(By.CSS_SELECTOR, '.pt__cost--price')
+                        nectar_price = nectar_elem.text.strip()
                     except Exception:
-                        # Fallback: get any price from the container
-                        regular_price = clean_price(price_container.text)
-                    
-                    # Extract Nectar price
-                    nectar_price = extract_nectar_price(price_container)
-                    
-                    # Ensure we have at least a regular price
-                    if regular_price == "N/A":
-                        continue
+                        nectar_price = 'N/A'
                     
                     # Check for duplicates
                     key = (name, category_name)
@@ -291,19 +255,19 @@ def scrape_single_category(base_url):
                         category_products.append({
                             "Category": category_name,
                             "Product Name": name,
-                            "Price": regular_price,
+                            "Price": price,
                             "Price with Nectar": nectar_price
                         })
                         seen.add(key)
                         new_products_count += 1
                         
-                except Exception as e:
+                except Exception:
                     continue
             
             seen_product_count = len(seen)
             print(f"{category_name}: Page {page_num} - {new_products_count} new products")
             
-            # Check for duplicate pages
+            # Check if we found any new products
             if seen_product_count == last_product_count:
                 duplicate_page_count += 1
                 print(f"{category_name}: No new products (duplicate page {duplicate_page_count}/{max_duplicate_pages})")
@@ -317,23 +281,23 @@ def scrape_single_category(base_url):
         return category_products
         
     except Exception as e:
-        print(f"Error in category: {e}")
+        print(f"Error in {category_name}: {e}")
         return []
     finally:
         try:
             if driver:
-                driver.close()
-                driver.quit()
+                driver.close()  # Close the window first
+                driver.quit()   # Then quit the driver
         except Exception:
-            pass
+            pass  # Suppress cleanup errors
 
 def scrape_sainsburys_optimized():
     """Main function with parallel processing"""
     print("Starting optimized Sainsbury's scraper...")
     start_time = time.time()
     
-    # Use only 1 worker for stability
-    with ThreadPoolExecutor(max_workers=1) as executor:
+    # Reduce max_workers to avoid too many browser instances
+    with ThreadPoolExecutor(max_workers=2) as executor:
         # Submit all category tasks
         future_to_url = {
             executor.submit(scrape_single_category, url): url 
@@ -358,12 +322,11 @@ def scrape_sainsburys_optimized():
         df = pd.DataFrame(all_products)
         df.to_csv("sainsburys.csv", index=False)
         
-        # Also save to app folder
+        # Also save to app folder if it exists
         try:
             df.to_csv("../app/public/sainsburys.csv", index=False)
-            print("✓ File also saved to app/public/sainsburys.csv")
-        except Exception as e:
-            print(f"Could not save to app folder: {e}")
+        except Exception:
+            pass
         
         end_time = time.time()
         duration = end_time - start_time
@@ -375,12 +338,6 @@ def scrape_sainsburys_optimized():
         print(f"Products per second: {len(all_products)/duration:.2f}")
         print(f"File saved: sainsburys.csv")
         print(f"{'='*50}")
-        
-        # Show sample of data
-        print("\nSample data:")
-        for i, product in enumerate(all_products[:5]):
-            print(f"{product['Category']},{product['Product Name']},{product['Price']},{product['Price with Nectar']}")
-        
     else:
         print("No products found.")
 
