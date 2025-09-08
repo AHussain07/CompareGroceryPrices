@@ -250,43 +250,46 @@ def setup_optimized_driver():
     chrome_version = get_chrome_version()
     is_github = detect_environment()
     
-    options = uc.ChromeOptions()
-    
-    # Common options
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument("--disable-extensions")
-    options.add_argument("--disable-web-security")
-    options.add_argument("--allow-running-insecure-content")
-    
-    # Environment-specific options
-    if is_github:
-        # GitHub Actions specific
-        options.add_argument("--headless")
-        options.add_argument("--disable-background-timer-throttling")
-        options.add_argument("--disable-renderer-backgrounding")
-        options.add_argument("--disable-backgrounding-occluded-windows")
-        options.add_argument("--disable-features=TranslateUI")
-        options.add_argument("--disable-features=VizDisplayCompositor")
-        options.add_argument("--window-size=1920,1080")
-        # Disable images for speed
-        prefs = {"profile.managed_default_content_settings.images": 2}
-        options.add_experimental_option("prefs", prefs)
-    else:
-        # Local development
-        options.add_argument("--start-maximized")
-        # Can be non-headless for debugging
-        # options.add_argument("--headless")  # Uncomment for headless mode
-    
-    # User agent
-    options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36")
+    # Create fresh options for each attempt
+    def create_fresh_options():
+        options = uc.ChromeOptions()
+        
+        # Common options
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-web-security")
+        options.add_argument("--allow-running-insecure-content")
+        
+        # Environment-specific options
+        if is_github:
+            # GitHub Actions specific
+            options.add_argument("--headless")
+            options.add_argument("--disable-background-timer-throttling")
+            options.add_argument("--disable-renderer-backgrounding")
+            options.add_argument("--disable-backgrounding-occluded-windows")
+            options.add_argument("--disable-features=TranslateUI")
+            options.add_argument("--disable-features=VizDisplayCompositor")
+            options.add_argument("--window-size=1920,1080")
+            # Disable images for speed
+            prefs = {"profile.managed_default_content_settings.images": 2}
+            options.add_experimental_option("prefs", prefs)
+        else:
+            # Local development
+            options.add_argument("--start-maximized")
+        
+        # User agent
+        options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36")
+        
+        return options
 
     try:
         if is_github:
             # GitHub Actions: Try with explicit driver path first
             try:
+                options = create_fresh_options()
                 driver = uc.Chrome(
                     driver_executable_path='/usr/local/bin/chromedriver',
                     options=options,
@@ -298,23 +301,44 @@ def setup_optimized_driver():
             except Exception as e:
                 print(f"Failed with explicit path: {e}")
         
-        # Try with detected version
-        if chrome_version:
-            print(f"Attempting to create driver with Chrome version {chrome_version}")
+        # Try with auto-detection (force version None for compatibility)
+        try:
+            print("Attempting auto-detection with version_main=None...")
+            options = create_fresh_options()
+            driver = uc.Chrome(version_main=None, options=options)
+            driver.delete_all_cookies()
+            print("✅ Driver created successfully with auto-detection")
+            return driver
+        except Exception as e:
+            print(f"Failed with auto-detection: {e}")
+        
+        # Try with detected Chrome version only if it makes sense
+        if chrome_version and chrome_version in [129, 130, 131]:  # Known working versions
             try:
+                print(f"Attempting with compatible Chrome version {chrome_version}")
+                options = create_fresh_options()
                 driver = uc.Chrome(version_main=chrome_version, options=options)
                 driver.delete_all_cookies()
-                print("✅ Driver created successfully with detected version")
+                print("✅ Driver created successfully with compatible version")
                 return driver
             except Exception as e:
-                print(f"Failed with detected version {chrome_version}: {e}")
+                print(f"Failed with version {chrome_version}: {e}")
         
-        # Fallback: auto-detection
-        print("Attempting auto-detection fallback...")
-        driver = uc.Chrome(version_main=None, options=options)
-        driver.delete_all_cookies()
-        print("✅ Driver created successfully with auto-detection")
-        return driver
+        # Final fallback - try common versions
+        for fallback_version in [129, 130, 131, None]:
+            try:
+                print(f"Trying fallback version: {fallback_version}")
+                options = create_fresh_options()
+                driver = uc.Chrome(version_main=fallback_version, options=options)
+                driver.delete_all_cookies()
+                print(f"✅ Driver created with fallback version {fallback_version}")
+                return driver
+            except Exception as e:
+                print(f"Fallback version {fallback_version} failed: {e}")
+                continue
+        
+        print("❌ All driver creation attempts failed")
+        return None
         
     except Exception as e:
         print(f"Failed to create driver: {e}")

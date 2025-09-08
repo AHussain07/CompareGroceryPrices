@@ -45,17 +45,12 @@ jobs:
     
     - name: Install matching ChromeDriver
       run: |
-        # Get Chrome major version
-        CHROME_MAJOR=$(google-chrome --version | sed 's/Google Chrome //' | cut -d'.' -f1)
-        echo "Chrome major version: $CHROME_MAJOR"
-        
-        # Use Chrome for Testing API
-        echo "Getting ChromeDriver for Chrome $CHROME_MAJOR"
-        LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE")
-        echo "Using ChromeDriver version: $LATEST_VERSION"
+        # Force a stable ChromeDriver version that works with both Chrome 139 and 140
+        CHROMEDRIVER_VERSION="129.0.6668.89"
+        echo "Using stable ChromeDriver version: $CHROMEDRIVER_VERSION"
         
         # Download and install ChromeDriver
-        wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$LATEST_VERSION/linux64/chromedriver-linux64.zip"
+        wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$CHROMEDRIVER_VERSION/linux64/chromedriver-linux64.zip"
         sudo unzip /tmp/chromedriver.zip -d /tmp/
         sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
         sudo chmod +x /usr/local/bin/chromedriver
