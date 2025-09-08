@@ -51,7 +51,7 @@ jobs:
         
         # Use Chrome for Testing API
         echo "Getting ChromeDriver for Chrome $CHROME_MAJOR"
-        LATEST_VERSION="139.0.6778.85"  # Force Chrome 139 compatible version
+        LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE")
         echo "Using ChromeDriver version: $LATEST_VERSION"
         
         # Download and install ChromeDriver
@@ -178,7 +178,7 @@ jobs:
       if: steps.results.outputs.success == 'true' && steps.results.outputs.product_count > 0
       run: |
         git config --global user.email "actions@github.com"
-        git config --global user.name "GitHub Actions - Sainsburys Original"
+        git config --global user.name "GitHub Actions - Sainsbury's Original"
         
         # Add CSV file
         git add -f app/public/sainsburys.csv

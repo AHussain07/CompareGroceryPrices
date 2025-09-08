@@ -16,9 +16,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # === Patch uc.Chrome destructor to prevent WinError 6 warnings ===
 uc.Chrome.__del__ = lambda self: None
 
-
 # ========== SCRAPER CONFIG ==========
-MAX_THREADS = 1  # Reduced to 1 for better stability with ChromeDriver issues
+MAX_THREADS = 1  # Sequential for GitHub Actions stability
 BASE_URL = "https://www.sainsburys.co.uk"
 
 CATEGORY_URLS = [
@@ -134,13 +133,14 @@ CATEGORY_URLS = [
     "https://www.sainsburys.co.uk/gol-ui/groceries/meat-and-fish/turkey/c:1054773"
 ]
 
-
-
 OUTPUT_FILE = "sainsburys.csv"
 APP_OUTPUT_FILE = "../app/public/sainsburys.csv"
 
 # ====================================
 
+def detect_environment():
+    """Detect if running in GitHub Actions or local environment"""
+    return os.environ.get('GITHUB_ACTIONS') == 'true'
 
 def kill_chrome_processes():
     """Kill all Chrome and ChromeDriver processes"""
@@ -152,46 +152,45 @@ def kill_chrome_processes():
                     print(f"Killed process: {proc.info['name']} (PID: {proc.info['pid']})")
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 pass
-        time.sleep(1)  # Wait for processes to terminate
+        time.sleep(1)
     except Exception as e:
         print(f"Error killing processes: {e}")
 
-
 def get_chrome_version():
-    """Get installed Chrome version on Windows"""
+    """Get Chrome version for both Windows and Linux"""
     try:
-        # Try registry method first
-        try:
-            result = subprocess.run([
-                'reg', 'query', 'HKEY_CURRENT_USER\\Software\\Google\\Chrome\\BLBeacon', '/v', 'version'
-            ], capture_output=True, text=True, timeout=10)
-            
-            if result.returncode == 0:
-                version_match = re.search(r'(\d+)\.(\d+)\.(\d+)\.(\d+)', result.stdout)
-                if version_match:
-                    full_version = version_match.group(0)
-                    major_version = int(version_match.group(1))
-                    print(f"Detected Chrome version: {full_version} (major: {major_version})")
-                    return major_version
-        except:
-            pass
+        is_github = detect_environment()
         
-        # Try PowerShell method
-        try:
-            result = subprocess.run([
-                'powershell', '-command', 
-                '(Get-Item "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe").VersionInfo.ProductVersion'
-            ], capture_output=True, text=True, timeout=10)
-            
-            if result.returncode == 0:
-                version_match = re.search(r'(\d+)\.(\d+)\.(\d+)\.(\d+)', result.stdout)
-                if version_match:
-                    full_version = version_match.group(0)
-                    major_version = int(version_match.group(1))
-                    print(f"Detected Chrome version: {full_version} (major: {major_version})")
-                    return major_version
-        except:
-            pass
+        if is_github:
+            # Linux (GitHub Actions)
+            try:
+                result = subprocess.run(['google-chrome', '--version'], 
+                                     capture_output=True, text=True, timeout=10)
+                if result.returncode == 0:
+                    version_match = re.search(r'(\d+)\.(\d+)\.(\d+)\.(\d+)', result.stdout)
+                    if version_match:
+                        full_version = version_match.group(0)
+                        major_version = int(version_match.group(1))
+                        print(f"Detected Chrome version: {full_version} (major: {major_version})")
+                        return major_version
+            except:
+                pass
+        else:
+            # Windows (local)
+            try:
+                result = subprocess.run([
+                    'reg', 'query', 'HKEY_CURRENT_USER\\Software\\Google\\Chrome\\BLBeacon', '/v', 'version'
+                ], capture_output=True, text=True, timeout=10)
+                
+                if result.returncode == 0:
+                    version_match = re.search(r'(\d+)\.(\d+)\.(\d+)\.(\d+)', result.stdout)
+                    if version_match:
+                        full_version = version_match.group(0)
+                        major_version = int(version_match.group(1))
+                        print(f"Detected Chrome version: {full_version} (major: {major_version})")
+                        return major_version
+            except:
+                pass
         
         print("Could not detect Chrome version - will use auto-detection")
         return None
@@ -200,23 +199,31 @@ def get_chrome_version():
         print(f"Error detecting Chrome version: {e}")
         return None
 
-
 def cleanup_chromedriver_files():
-    """Comprehensive cleanup of ChromeDriver files"""
+    """Cleanup ChromeDriver files for both environments"""
     try:
         print("🧹 Starting comprehensive ChromeDriver cleanup...")
-        
-        # Kill all Chrome processes first
         kill_chrome_processes()
         
-        # Clean up undetected_chromedriver directory
-        cleanup_paths = [
-            os.path.join(os.path.expanduser("~"), "appdata", "roaming", "undetected_chromedriver"),
-            os.path.join(os.path.expanduser("~"), "AppData", "Roaming", "undetected_chromedriver"),
-            os.path.join(os.path.expanduser("~"), ".cache", "undetected_chromedriver"),
-            os.path.join(os.getcwd(), "chromedriver.exe"),
-            os.path.join(os.getcwd(), "chromedriver"),
-        ]
+        is_github = detect_environment()
+        
+        if is_github:
+            # Linux cleanup paths
+            cleanup_paths = [
+                "/tmp/chromedriver",
+                "/usr/local/bin/chromedriver_backup",
+                os.path.join(os.path.expanduser("~"), ".cache", "undetected_chromedriver"),
+                os.path.join(os.path.expanduser("~"), ".local", "share", "undetected_chromedriver"),
+            ]
+        else:
+            # Windows cleanup paths
+            cleanup_paths = [
+                os.path.join(os.path.expanduser("~"), "appdata", "roaming", "undetected_chromedriver"),
+                os.path.join(os.path.expanduser("~"), "AppData", "Roaming", "undetected_chromedriver"),
+                os.path.join(os.path.expanduser("~"), ".cache", "undetected_chromedriver"),
+                os.path.join(os.getcwd(), "chromedriver.exe"),
+                os.path.join(os.getcwd(), "chromedriver"),
+            ]
         
         for path in cleanup_paths:
             if os.path.exists(path):
@@ -231,37 +238,67 @@ def cleanup_chromedriver_files():
                     print(f"   ⚠️ Could not remove {path}: {e}")
         
         print("✅ ChromeDriver cleanup completed")
-        time.sleep(1)  # Wait for cleanup
+        time.sleep(1)
         
     except Exception as e:
         print(f"Error during cleanup: {e}")
 
-
 def setup_optimized_driver():
-    """Setup optimized Chrome driver with proper version handling"""
-    # Clean up any existing conflicting files first
+    """Setup Chrome driver optimized for both local and GitHub Actions"""
     cleanup_chromedriver_files()
     
-    # Get Chrome version
     chrome_version = get_chrome_version()
+    is_github = detect_environment()
     
     options = uc.ChromeOptions()
-    prefs = {"profile.managed_default_content_settings.images": 2}  # disable images
-    options.add_experimental_option("prefs", prefs)
-
+    
+    # Common options
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
     options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument("--start-maximized")
     options.add_argument("--disable-extensions")
-    options.add_argument("--headless")
     options.add_argument("--disable-web-security")
     options.add_argument("--allow-running-insecure-content")
-    options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36")
+    
+    # Environment-specific options
+    if is_github:
+        # GitHub Actions specific
+        options.add_argument("--headless")
+        options.add_argument("--disable-background-timer-throttling")
+        options.add_argument("--disable-renderer-backgrounding")
+        options.add_argument("--disable-backgrounding-occluded-windows")
+        options.add_argument("--disable-features=TranslateUI")
+        options.add_argument("--disable-features=VizDisplayCompositor")
+        options.add_argument("--window-size=1920,1080")
+        # Disable images for speed
+        prefs = {"profile.managed_default_content_settings.images": 2}
+        options.add_experimental_option("prefs", prefs)
+    else:
+        # Local development
+        options.add_argument("--start-maximized")
+        # Can be non-headless for debugging
+        # options.add_argument("--headless")  # Uncomment for headless mode
+    
+    # User agent
+    options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36")
 
     try:
-        # Try with detected Chrome version first
+        if is_github:
+            # GitHub Actions: Try with explicit driver path first
+            try:
+                driver = uc.Chrome(
+                    driver_executable_path='/usr/local/bin/chromedriver',
+                    options=options,
+                    version_main=None
+                )
+                driver.delete_all_cookies()
+                print("✅ Driver created successfully with explicit path")
+                return driver
+            except Exception as e:
+                print(f"Failed with explicit path: {e}")
+        
+        # Try with detected version
         if chrome_version:
             print(f"Attempting to create driver with Chrome version {chrome_version}")
             try:
@@ -272,7 +309,7 @@ def setup_optimized_driver():
             except Exception as e:
                 print(f"Failed with detected version {chrome_version}: {e}")
         
-        # Fallback: Let undetected-chromedriver auto-detect
+        # Fallback: auto-detection
         print("Attempting auto-detection fallback...")
         driver = uc.Chrome(version_main=None, options=options)
         driver.delete_all_cookies()
@@ -283,31 +320,18 @@ def setup_optimized_driver():
         print(f"Failed to create driver: {e}")
         return None
 
-
 def check_pagination_and_duplicates(driver, current_page_products, all_seen_products):
     """Check pagination status and detect duplicate content"""
     
-    # Check for duplicate products (indicates we've hit the end)
+    # Check for duplicate products
     current_product_names = {p["Product Name"] for p in current_page_products}
     overlap = current_product_names.intersection(all_seen_products)
     
-    # Only stop if we have a very high overlap (90%+) indicating true duplicates
-    if len(overlap) > len(current_product_names) * 0.9:  # More than 90% overlap
+    if len(overlap) > len(current_page_products) * 0.9:  # 90% overlap
         print(f"   🔄 Detected {len(overlap)} duplicate products - likely reached end")
         return True
     
-    # Check URL for actual page number
-    try:
-        current_url = driver.current_url
-        if "page=" in current_url:
-            page_match = re.search(r'page=(\d+)', current_url)
-            if page_match:
-                current_page_num = int(page_match.group(1))
-                print(f"   📍 Current URL page: {current_page_num}")
-    except:
-        pass
-    
-    # Check for disabled next button
+    # Check pagination buttons
     try:
         disabled_selectors = [
             'button[rel="next"].ln-c-pagination__link.is-disabled',
@@ -326,7 +350,6 @@ def check_pagination_and_duplicates(driver, current_page_products, all_seen_prod
             except:
                 continue
         
-        # Check for enabled next button
         enabled_selectors = [
             'button[rel="next"]:not(.is-disabled):not([disabled]):not([aria-disabled="true"])',
             '.ln-c-pagination__link[rel="next"]:not(.is-disabled):not([disabled]):not([aria-disabled="true"])'
@@ -350,30 +373,26 @@ def check_pagination_and_duplicates(driver, current_page_products, all_seen_prod
     
     except Exception as e:
         print(f"   ⚠️ Error checking pagination: {e}")
-        return True  # Assume last page on error
+        return True
     
     return False
 
-
 def scrape_category(driver, url):
-    """Scrape all pages from a category with improved pagination and duplicate detection"""
+    """Scrape all pages from a category"""
     products = []
     page = 1
     all_seen_product_names = set()
     consecutive_duplicate_pages = 0
-    max_pages = 50  # Increased safety limit for larger categories
+    max_pages = 50
 
-    # Extract category name from URL
-    # Extract category name - get the last meaningful part before the ID
+    # Extract category name
     url_parts = url.rstrip('/').split('/')
-    # Find the part just before the category ID (c:xxxxx)
     for i, part in enumerate(url_parts):
         if part.startswith('c:'):
             if i > 0:
                 category_name = url_parts[i-1]
                 break
     else:
-        # Fallback to groceries section
         try:
             category_name = url.split('/groceries/')[1].split('/')[0]
         except:
@@ -387,14 +406,15 @@ def scrape_category(driver, url):
                 paged_url = url
             else:
                 paged_url = f"{url}/opt/page:{page}"
-            print(f"   📄 Scraping page {page}...")
             
+            print(f"   📄 Scraping page {page}...")
             driver.get(paged_url)
-            time.sleep(random.uniform(1.0, 2.0))
+            
+            # Shorter waits for GitHub Actions
+            time.sleep(random.uniform(0.5, 1.0))
 
-            # Wait for products to load
             try:
-                WebDriverWait(driver, 20).until(
+                WebDriverWait(driver, 15).until(
                     EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".pt__content"))
                 )
             except:
@@ -407,28 +427,24 @@ def scrape_category(driver, url):
                 break
 
             page_products = []
-            page_products_count = 0
             
             for product in product_elements:
                 try:
                     name = product.find_element(By.CSS_SELECTOR, ".pt__info a").text.strip()
                     
-                    # Extract regular price and nectar price separately
+                    # Extract regular price
                     try:
-                        # Try to get regular price first
                         regular_price_elem = product.find_element(By.CSS_SELECTOR, '.pt__cost__retail-price')
                         price = regular_price_elem.text.strip()
-                        # Clean the price - extract just the £X.XX part
                         price_match = re.search(r'£[\d.]+', price)
                         price = price_match.group() if price_match else price.split()[0] if price else "N/A"
                     except:
                         price = "N/A"
 
+                    # Extract nectar price
                     try:
-                        # Try to get nectar price
                         nectar_elem = product.find_element(By.CSS_SELECTOR, '.pt__cost--price')
                         nectar_text = nectar_elem.text.strip()
-                        # Extract the nectar price (usually the first £X.XX in the nectar element)
                         nectar_match = re.search(r'£[\d.]+', nectar_text)
                         nectar_price = nectar_match.group() if nectar_match else "N/A"
                     except:
@@ -442,18 +458,17 @@ def scrape_category(driver, url):
                             "Price with Nectar": nectar_price
                         }
                         page_products.append(product_data)
-                        page_products_count += 1
                 except Exception:
                     continue
 
-            print(f"   ✅ Found {page_products_count} products on page {page}")
+            print(f"   ✅ Found {len(page_products)} products on page {page}")
 
-            # Check for duplicates and pagination
+            # Check for end conditions
             if check_pagination_and_duplicates(driver, page_products, all_seen_product_names):
                 print(f"   🏁 Reached last page for {category_name}")
                 break
 
-            # Add new products only (no duplicates)
+            # Add new products only
             new_products = []
             for product in page_products:
                 if product["Product Name"] not in all_seen_product_names:
@@ -462,20 +477,20 @@ def scrape_category(driver, url):
 
             products.extend(new_products)
             
-            # Check if we found any new products
-            new_products_this_page = len(new_products)
-            if new_products_this_page == 0:
+            # Track consecutive pages with no new products
+            if len(new_products) == 0:
                 consecutive_duplicate_pages += 1
                 print(f"   ⚠️ No new products on page {page} (consecutive: {consecutive_duplicate_pages})")
-                if consecutive_duplicate_pages >= 5:  # Increased tolerance to 5 pages
+                if consecutive_duplicate_pages >= 5:
                     print(f"   🛑 Stopping due to {consecutive_duplicate_pages} consecutive pages with no new products")
                     break
             else:
                 consecutive_duplicate_pages = 0
-                print(f"   ➕ Added {new_products_this_page} new products")
+                print(f"   ➕ Added {len(new_products)} new products")
 
             page += 1
-            time.sleep(random.uniform(1.0, 2.0))
+            # Shorter delays for GitHub Actions
+            time.sleep(random.uniform(0.5, 1.0))
 
         except Exception as e:
             print(f"   ❌ Error on page {page}: {e}")
@@ -484,9 +499,8 @@ def scrape_category(driver, url):
     print(f"✅ Category {category_name} completed: {len(products)} total unique products\n")
     return products
 
-
 def scrape_single_category(url):
-    """Run one thread for a category"""
+    """Run one category scrape"""
     driver = setup_optimized_driver()
     if not driver:
         print(f"❌ Failed to create driver for {url}")
@@ -500,15 +514,12 @@ def scrape_single_category(url):
             driver.quit()
         except:
             pass
-        # Clean up after each category
-        time.sleep(1)
-
+        time.sleep(0.5)  # Shorter cleanup delay
 
 def scrape_all_categories():
-    """Scrape all categories sequentially for better stability"""
+    """Scrape all categories sequentially"""
     all_products = []
     
-    # Use sequential processing instead of threading for better stability
     for i, url in enumerate(CATEGORY_URLS, 1):
         print(f"\n📊 Progress: Starting {i}/{len(CATEGORY_URLS)} categories")
         try:
@@ -518,12 +529,11 @@ def scrape_all_categories():
         except Exception as e:
             print(f"❌ Error scraping category {url}: {e}")
         
-        # Wait between categories to avoid issues
+        # Shorter delays for GitHub Actions
         if i < len(CATEGORY_URLS):
-            time.sleep(1)
+            time.sleep(0.5)
 
     return all_products
-
 
 def save_products(products):
     """Save scraped data to CSV files"""
@@ -539,23 +549,23 @@ def save_products(products):
         writer.writeheader()
         writer.writerows(products)
 
-    # Save to app/public folder
-    os.makedirs(os.path.dirname(APP_OUTPUT_FILE), exist_ok=True)
-    with open(APP_OUTPUT_FILE, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(products)
-
-    print(f"✅ Files saved: {OUTPUT_FILE} (local) and {APP_OUTPUT_FILE}")
-
+    # Save to app folder if possible
+    try:
+        os.makedirs(os.path.dirname(APP_OUTPUT_FILE), exist_ok=True)
+        with open(APP_OUTPUT_FILE, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(products)
+        print(f"✅ Files saved: {OUTPUT_FILE} (local) and {APP_OUTPUT_FILE}")
+    except:
+        print(f"✅ File saved: {OUTPUT_FILE}")
 
 def main():
-    print("🛒 Starting optimized Sainsbury's scraper...")
+    env = "GitHub Actions" if detect_environment() else "Local"
+    print(f"🛒 Starting Sainsbury's scraper ({env})...")
     print(f"📋 Categories to scrape: {len(CATEGORY_URLS)}")
-    print(f"🧵 Processing: Sequential (no threading)")
-    print(f"🔧 ChromeDriver: Enhanced cleanup and version detection")
-    print(f"📄 Pagination: Duplicate detection + disabled Next button")
-    print(f"🛑 Safety: Max 50 pages per category\n")  # ✅ Match the actual max_pages value
+    print(f"🧵 Processing: Sequential")
+    print(f"🛑 Safety: Max 50 pages per category\n")
 
     start_time = time.time()
     products = scrape_all_categories()
@@ -570,7 +580,6 @@ def main():
     if products:
         print(f"🚀 Products per second: {len(products)/elapsed:.2f}")
     print("="*60)
-
 
 if __name__ == "__main__":
     main()
