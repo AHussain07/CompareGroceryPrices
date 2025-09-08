@@ -154,27 +154,43 @@ def extract_nectar_price(price_text):
     return "N/A"
 
 def setup_optimized_driver():
-    """Setup optimized Chrome driver"""
+    """Setup optimized Chrome driver with better GitHub Actions compatibility"""
     options = uc.ChromeOptions()
+    
+    # Essential for GitHub Actions
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--disable-web-security')
+    options.add_argument('--disable-features=VizDisplayCompositor')
+    
     # Performance optimizations
     options.add_argument('--disable-images')
     options.add_argument('--disable-plugins')
     options.add_argument('--disable-extensions')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-gpu')
-    options.add_argument('--disable-web-security')
     options.add_argument('--disable-background-timer-throttling')
     options.add_argument('--disable-renderer-backgrounding')
     options.add_argument('--disable-backgrounding-occluded-windows')
     options.add_argument('--disable-blink-features=AutomationControlled')
     
     try:
-        driver = uc.Chrome(options=options)
+        # Try with explicit driver path first
+        driver = uc.Chrome(
+            options=options,
+            driver_executable_path='/usr/local/bin/chromedriver',
+            version_main=None
+        )
         return driver
     except Exception as e:
-        print(f"Failed to create driver: {e}")
-        return None
+        print(f"Failed with explicit path: {e}")
+        try:
+            # Fallback to auto-detection
+            driver = uc.Chrome(options=options, version_main=None)
+            return driver
+        except Exception as e2:
+            print(f"Failed with auto-detection: {e2}")
+            return None
 
 def handle_cookies_once(driver):
     """Handle cookies only once globally"""
