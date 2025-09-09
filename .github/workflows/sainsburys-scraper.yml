@@ -32,22 +32,30 @@ jobs:
         sudo apt-get install -y libnss3-dev libatk-bridge2.0-0 libdrm2 libxkbcommon0 libgtk-3-0 libatspi2.0-0
         sudo apt-get install -y libasound2t64 libxrandr2 libpangocairo-1.0-0 libatk1.0-0 libcairo-gobject2 libgdk-pixbuf2.0-0
     
-    - name: Install Chrome (stable version)
+    - name: Install Chrome and matching ChromeDriver
       run: |
+        # Get actual Chrome version first
         wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
         echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
         sudo apt-get update
         sudo apt-get install -y google-chrome-stable
         
-        # Get exact Chrome version
-        CHROME_VERSION=$(google-chrome --version)
-        echo "Installed Chrome version: $CHROME_VERSION"
-    
-    - name: Install matching ChromeDriver
-      run: |
-        # Force a stable ChromeDriver version that works with both Chrome 139 and 140
-        CHROMEDRIVER_VERSION="129.0.6668.89"
-        echo "Using stable ChromeDriver version: $CHROMEDRIVER_VERSION"
+        # Get the ACTUAL Chrome version
+        CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+\.\d+')
+        CHROME_MAJOR=$(echo $CHROME_VERSION | cut -d. -f1)
+        echo "Actual Chrome version: $CHROME_VERSION (major: $CHROME_MAJOR)"
+        
+        # Download matching ChromeDriver based on actual Chrome version
+        if [ "$CHROME_MAJOR" = "139" ]; then
+          CHROMEDRIVER_VERSION="139.0.6858.0"
+        elif [ "$CHROME_MAJOR" = "140" ]; then
+          CHROMEDRIVER_VERSION="140.0.7372.0"
+        else
+          # Fallback to a stable version
+          CHROMEDRIVER_VERSION="129.0.6668.89"
+        fi
+        
+        echo "Using ChromeDriver version: $CHROMEDRIVER_VERSION"
         
         # Download and install ChromeDriver
         wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$CHROMEDRIVER_VERSION/linux64/chromedriver-linux64.zip"
@@ -55,9 +63,9 @@ jobs:
         sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
         sudo chmod +x /usr/local/bin/chromedriver
         
-        # Verify installation
-        chromedriver --version
-        echo "ChromeDriver installed successfully"
+        # Verify versions match
+        echo "Chrome version: $(google-chrome --version)"
+        echo "ChromeDriver version: $(chromedriver --version)"
     
     - name: Install Python dependencies
       run: |
