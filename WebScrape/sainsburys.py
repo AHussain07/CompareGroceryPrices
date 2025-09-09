@@ -248,6 +248,9 @@ def setup_optimized_driver():
     cleanup_chromedriver_files()
     
     is_github = detect_environment()
+    chrome_version = get_chrome_version()
+    
+    print(f"Detected Chrome version: {chrome_version}")
     
     # Create fresh options for each attempt
     def create_fresh_options():
@@ -261,6 +264,7 @@ def setup_optimized_driver():
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-web-security")
         options.add_argument("--allow-running-insecure-content")
+        options.add_argument("--disable-features=VizDisplayCompositor")
         
         # Environment-specific options
         if is_github:
@@ -270,7 +274,6 @@ def setup_optimized_driver():
             options.add_argument("--disable-renderer-backgrounding")
             options.add_argument("--disable-backgrounding-occluded-windows")
             options.add_argument("--disable-features=TranslateUI")
-            options.add_argument("--disable-features=VizDisplayCompositor")
             options.add_argument("--window-size=1920,1080")
             # Disable images for speed
             prefs = {"profile.managed_default_content_settings.images": 2}
@@ -280,57 +283,50 @@ def setup_optimized_driver():
             options.add_argument("--start-maximized")
         
         # User agent
-        options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36")
+        options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36")
         
         return options
 
     try:
-        # Force version 139 to match actual Chrome browser
-        target_version = 139
+        # Strategy 1: Try with explicit ChromeDriver path (GitHub Actions)
+        if is_github:
+            try:
+                options = create_fresh_options()
+                driver = uc.Chrome(
+                    driver_executable_path='/usr/local/bin/chromedriver',
+                    options=options,
+                    version_main=None  # Let it auto-detect
+                )
+                driver.delete_all_cookies()
+                print("✅ Driver created successfully with explicit path")
+                return driver
+            except Exception as e:
+                print(f"Failed with explicit path: {e}")
         
-        print(f"🎯 Targeting ChromeDriver version {target_version} to match actual Chrome")
-        
-        # Try with the correct Chrome version (139)
+        # Strategy 2: Auto-detection with version_main=None
         try:
+            print("Attempting auto-detection with version_main=None...")
             options = create_fresh_options()
-            driver = uc.Chrome(version_main=target_version, options=options)
+            driver = uc.Chrome(version_main=None, options=options)
             driver.delete_all_cookies()
-            print("✅ Driver created successfully with Chrome 139")
+            print("✅ Driver created successfully with auto-detection")
             return driver
         except Exception as e:
-            print(f"Failed with Chrome 139: {e}")
+            print(f"Failed with auto-detection: {e}")
         
-        # Try auto-detection as fallback
-        try:
-            print("Attempting auto-detection fallback...")
-            options = create_fresh_options()
-            # Force the driver to use existing Chrome installation
-            driver = uc.Chrome(
-                version_main=None,
-                options=options,
-                use_subprocess=False  # Use existing Chrome
-            )
-            driver.delete_all_cookies()
-            print("✅ Driver created with auto-detection")
-            return driver
-        except Exception as e:
-            print(f"Auto-detection failed: {e}")
-        
-        # Try without version specification
-        try:
-            print("Attempting version-agnostic approach...")
-            options = create_fresh_options()
-            
-            if is_github:
-                # For GitHub Actions, try to use system Chrome directly
-                options.binary_location = "/usr/bin/google-chrome"
-            
-            driver = uc.Chrome(options=options)
-            driver.delete_all_cookies()
-            print("✅ Driver created with version-agnostic approach")
-            return driver
-        except Exception as e:
-            print(f"Version-agnostic approach failed: {e}")
+        # Strategy 3: Try with compatible versions
+        compatible_versions = [140, 139, 129, 130, 131]
+        for version in compatible_versions:
+            try:
+                print(f"Trying Chrome version {version}...")
+                options = create_fresh_options()
+                driver = uc.Chrome(version_main=version, options=options)
+                driver.delete_all_cookies()
+                print(f"✅ Driver created with Chrome version {version}")
+                return driver
+            except Exception as e:
+                print(f"Failed with version {version}: {e}")
+                continue
         
         print("❌ All driver creation attempts failed")
         return None

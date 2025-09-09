@@ -45,27 +45,45 @@ jobs:
         CHROME_MAJOR=$(echo $CHROME_VERSION | cut -d. -f1)
         echo "Actual Chrome version: $CHROME_VERSION (major: $CHROME_MAJOR)"
         
-        # Download matching ChromeDriver based on actual Chrome version
-        if [ "$CHROME_MAJOR" = "139" ]; then
-          CHROMEDRIVER_VERSION="139.0.6858.0"
-        elif [ "$CHROME_MAJOR" = "140" ]; then
-          CHROMEDRIVER_VERSION="140.0.7372.0"
+        # Use correct ChromeDriver versions that actually exist
+        if [ "$CHROME_MAJOR" = "140" ]; then
+          CHROMEDRIVER_VERSION="140.0.7339.80"  # This version exists
+        elif [ "$CHROME_MAJOR" = "139" ]; then
+          CHROMEDRIVER_VERSION="139.0.6858.80"
+        elif [ "$CHROME_MAJOR" = "129" ]; then
+          CHROMEDRIVER_VERSION="129.0.6668.89"
         else
-          # Fallback to a stable version
+          # Universal fallback to a stable version
           CHROMEDRIVER_VERSION="129.0.6668.89"
         fi
         
         echo "Using ChromeDriver version: $CHROMEDRIVER_VERSION"
         
-        # Download and install ChromeDriver
-        wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/$CHROMEDRIVER_VERSION/linux64/chromedriver-linux64.zip"
-        sudo unzip /tmp/chromedriver.zip -d /tmp/
-        sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
-        sudo chmod +x /usr/local/bin/chromedriver
+        # Try downloading ChromeDriver
+        CHROMEDRIVER_URL="https://storage.googleapis.com/chrome-for-testing-public/$CHROMEDRIVER_VERSION/linux64/chromedriver-linux64.zip"
+        echo "Downloading from: $CHROMEDRIVER_URL"
         
-        # Verify versions match
+        if wget -O /tmp/chromedriver.zip "$CHROMEDRIVER_URL"; then
+          echo "✅ ChromeDriver downloaded successfully"
+          sudo unzip /tmp/chromedriver.zip -d /tmp/
+          sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
+          sudo chmod +x /usr/local/bin/chromedriver
+        else
+          echo "❌ Failed to download ChromeDriver version $CHROMEDRIVER_VERSION"
+          echo "🔄 Trying fallback version 129.0.6668.89..."
+          
+          # Fallback to known working version
+          wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/129.0.6668.89/linux64/chromedriver-linux64.zip"
+          sudo unzip /tmp/chromedriver.zip -d /tmp/
+          sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
+          sudo chmod +x /usr/local/bin/chromedriver
+          echo "✅ Fallback ChromeDriver installed"
+        fi
+        
+        # Verify installation
         echo "Chrome version: $(google-chrome --version)"
         echo "ChromeDriver version: $(chromedriver --version)"
+        echo "ChromeDriver location: $(which chromedriver)"
     
     - name: Install Python dependencies
       run: |
