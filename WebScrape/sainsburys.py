@@ -474,20 +474,20 @@ def scrape_category(driver, url):
             except:
                 pass
 
-            # Try multiple selectors for product containers - SIMPLIFIED approach
+            # Enhanced product container detection - keeping your working selector first
             product_elements = []
-
-            # Start with the working selector first
+            
+            # Try your proven working selector first
             try:
                 product_elements = driver.find_elements(By.CSS_SELECTOR, ".pt__content")
                 if product_elements:
                     print(f"   ✅ Found {len(product_elements)} products using selector: .pt__content")
                 else:
-                    # Only try alternatives if the main one fails
+                    # Only try alternatives if main selector finds nothing
                     alternative_selectors = [
-                        ".pt__content--with-header",
-                        ".pt__content--optimised", 
-                        "*[class*='pt__content']"
+                        ".pt__content--with-header",      # For categories with header variations
+                        "*[class*='pt__content']",        # Catch any pt__content variations
+                        ".pt-grid-item .pt__content",     # Nested content in grid items
                     ]
                     
                     for selector in alternative_selectors:
@@ -497,12 +497,10 @@ def scrape_category(driver, url):
                                 print(f"   ✅ Found {len(elements)} products using selector: {selector}")
                                 product_elements = elements
                                 break
-                        except Exception as e:
-                            print(f"   ❌ Error with selector '{selector}': {e}")
+                        except:
                             continue
-                
-            except Exception as e:
-                print(f"   ❌ Error with main selector: {e}")
+            except:
+                pass
 
             if not product_elements:
                 print(f"   ⚠️ No product elements found on page {page}")
@@ -510,33 +508,33 @@ def scrape_category(driver, url):
 
             page_products = []
             
-            # Replace the entire product extraction loop (around lines 300-350):
             for product in product_elements:
                 try:
-                    # Simplified name extraction - start with basic approach
-                    name = None
-                    
-                    # Try the main selector first
+                    # Enhanced product name - handle truncated names better
                     try:
                         name_elem = product.find_element(By.CSS_SELECTOR, ".pt__link")
                         name = name_elem.text.strip()
+                        
+                        # Check for truncated names and get full title
                         full_title = name_elem.get_attribute('title')
-                        # Use full title if name appears truncated
                         if name.endswith('...') and full_title and len(full_title) > len(name):
                             name = full_title.strip()
+                        elif not name and full_title:  # Fallback to title if text is empty
+                            name = full_title.strip()
+                            
                     except:
-                        # Fallback selectors if main one fails
+                        # Fallback selectors for different product layouts
+                        name = None
                         fallback_selectors = [
                             ".pt__info__description a",
-                            "h2 a", 
-                            "a[title]",
-                            ".pt__info a"
+                            "h2 a",
+                            "a[title]"
                         ]
                         
-                        for selector in fallback_selectors:
+                        for fallback in fallback_selectors:
                             try:
-                                name_elem = product.find_element(By.CSS_SELECTOR, selector)
-                                name = name_elem.text.strip()
+                                fallback_elem = product.find_element(By.CSS_SELECTOR, fallback)
+                                name = fallback_elem.text.strip() or fallback_elem.get_attribute('title')
                                 if name:
                                     break
                             except:
@@ -545,16 +543,16 @@ def scrape_category(driver, url):
                     if not name:
                         continue
                     
-                    # Simplified price extraction
-                    price = "N/A"
+                    # Enhanced price extraction with better regex
                     try:
                         price_elem = product.find_element(By.CSS_SELECTOR, '[data-testid="pt-retail-price"]')
                         price_text = price_elem.text.strip()
+                        # Enhanced regex to catch £X.XX, £X, and Xp formats
                         price_match = re.search(r'£[\d.,]+|\d+p', price_text)
-                        if price_match:
-                            price = price_match.group()
+                        price = price_match.group() if price_match else "N/A"
                     except:
                         # Fallback price selectors
+                        price = "N/A"
                         price_selectors = [
                             '.pt__cost__retail-price',
                             '*[class*="retail-price"]',
@@ -572,20 +570,24 @@ def scrape_category(driver, url):
                             except:
                                 continue
 
-                    # Simplified Nectar price extraction
+                    # Nectar price - handle cases where it doesn't exist
                     nectar_price = "N/A"
                     try:
+                        # Check if there's a contextual price wrapper first
                         contextual_wrapper = product.find_element(By.CSS_SELECTOR, '[data-testid="whole-contextual-price"]')
                         if contextual_wrapper:
-                            nectar_elem = product.find_element(By.CSS_SELECTOR, '[data-testid="contextual-price-text"]')
-                            nectar_text = nectar_elem.text.strip()
-                            nectar_match = re.search(r'£[\d.,]+|\d+p', nectar_text)
-                            if nectar_match:
-                                nectar_price = nectar_match.group()
+                            try:
+                                nectar_elem = product.find_element(By.CSS_SELECTOR, '[data-testid="contextual-price-text"]')
+                                nectar_text = nectar_elem.text.strip()
+                                nectar_match = re.search(r'£[\d.,]+|\d+p', nectar_text)
+                                if nectar_match:
+                                    nectar_price = nectar_match.group()
+                            except:
+                                pass
                     except:
+                        # No contextual price wrapper means no Nectar price available
                         pass
 
-                    # Only add products with valid name and price
                     if name and price != "N/A":
                         product_data = {
                             "Category": category_name,
@@ -594,59 +596,36 @@ def scrape_category(driver, url):
                             "Price with Nectar": nectar_price
                         }
                         page_products.append(product_data)
-                        
-                except Exception as e:
-                    # Less verbose error logging
+                except Exception:
                     continue
 
             print(f"   ✅ Found {len(page_products)} products on page {page}")
-
-            # Enhanced debugging - add this section
-            if len(page_products) == 0 and len(product_elements) > 0:
-                print(f"   🔍 DEBUGGING: Checking first product element...")
+            
+            # Quick debug for categories returning 0 products
+            if len(page_products) == 0 and len(product_elements) > 5:
+                print(f"   🔍 DEBUG: Found {len(product_elements)} elements but 0 valid products")
+                # Check first element structure
                 try:
-                    first_product = product_elements[0]
-                    print(f"   🔍 Element HTML preview: {first_product.get_attribute('outerHTML')[:200]}...")
+                    first_elem = product_elements[0]
+                    elem_classes = first_elem.get_attribute('class')
+                    print(f"   🔍 First element classes: {elem_classes}")
                     
-                    # Check if name extraction works
-                    name_found = False
-                    for name_selector in [".pt__link", ".pt__info__description a", "h2 a", "a[title]"]:
-                        try:
-                            name_elem = first_product.find_element(By.CSS_SELECTOR, name_selector)
-                            name_text = name_elem.text.strip()
-                            if name_text:
-                                print(f"   🔍 Found name with '{name_selector}': {name_text[:50]}...")
-                                name_found = True
-                                break
-                        except Exception as e:
-                            print(f"   🔍 Name selector '{name_selector}' failed: {e}")
-                    
-                    if not name_found:
-                        print(f"   🔍 No name found - checking all links in element:")
-                        links = first_product.find_elements(By.TAG_NAME, "a")
-                        for i, link in enumerate(links[:3]):
-                            try:
-                                link_text = link.text.strip()
-                                link_title = link.get_attribute('title')
-                                print(f"   🔍 Link {i+1}: text='{link_text[:30]}...', title='{link_title}'")
-                            except:
-                                pass
-                                
-                except Exception as e:
-                    print(f"   🔍 Debug error: {e}")
-
-            # Debug: Show sample product details (keep existing)
-            if page_products:
-                print(f"   🔍 Sample product: {page_products[0]}")
-            else:
-                print(f"   ⚠️ No valid products extracted from {len(product_elements)} elements")
+                    # Check for any links in the element
+                    links = first_elem.find_elements(By.TAG_NAME, "a")
+                    if links:
+                        sample_link = links[0]
+                        link_text = sample_link.text.strip()[:50]
+                        link_title = sample_link.get_attribute('title')
+                        print(f"   🔍 Sample link: text='{link_text}', title='{link_title}'")
+                except:
+                    pass
 
             # Check for end conditions
             if check_pagination_and_duplicates(driver, page_products, all_seen_product_names):
                 print(f"   🏁 Reached last page for {category_name}")
                 break
 
-            # Add new products only - FIXED VERSION
+            # Add new products only
             new_products = []
             for product in page_products:
                 if product["Product Name"] not in all_seen_product_names:
@@ -654,13 +633,8 @@ def scrape_category(driver, url):
                     all_seen_product_names.add(product["Product Name"])
 
             products.extend(new_products)
-
-            # Debug output
-            print(f"   📊 Products found on page: {len(page_products)}")
-            print(f"   📊 New products added: {len(new_products)}")
-            print(f"   📊 Total unique products so far: {len(products)}")
-
-            # Track consecutive pages with no new products
+            
+            # Reduce duplicate page threshold for faster processing
             if len(new_products) == 0:
                 consecutive_duplicate_pages += 1
                 print(f"   ⚠️ No new products on page {page} (consecutive: {consecutive_duplicate_pages})")
