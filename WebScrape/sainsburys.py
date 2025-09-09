@@ -474,55 +474,124 @@ def scrape_category(driver, url):
             except:
                 pass
 
-            # Try multiple selectors for product containers - updated for both patterns
+            # Try multiple selectors for product containers - comprehensive approach
             product_selectors = [
-                ".pt__content",           # Direct content divs (first pattern)
-                ".pt-grid-item",          # Grid items containing products (second pattern)  
-                "article.pt",             # Article elements (second pattern)
-                ".ln-c-card.pt",          # Card elements (second pattern)
+                ".pt__content",                           # Standard content divs  
+                ".pt__content--with-header",              # Content with header variation
+                ".pt__content--optimised",                # Optimised version
+                ".pt__content--optimised-bigger",         # Bigger optimised version
+                "*[class*='pt__content']",                # Any element with pt__content in class
+                ".pt-grid-item",                          # Grid items containing products
+                "article.pt",                             # Article elements  
+                ".ln-c-card.pt",                          # Card elements
+                "*[data-testid*='product-tile']",         # Any element with product-tile testid
             ]
 
             product_elements = []
             for selector in product_selectors:
                 try:
-                    WebDriverWait(driver, 10).until(
-                        EC.presence_of_all_elements_located((By.CSS_SELECTOR, selector))
-                    )
-                    product_elements = driver.find_elements(By.CSS_SELECTOR, selector)
-                    if product_elements:
-                        print(f"   ✅ Found {len(product_elements)} products using selector: {selector}")
+                    elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                    if elements:
+                        print(f"   ✅ Found {len(elements)} products using selector: {selector}")
+                        product_elements = elements
                         break
-                except:
+                    else:
+                        print(f"   ❌ No elements found with selector: {selector}")
+                except Exception as e:
+                    print(f"   ❌ Error with selector '{selector}': {e}")
                     continue
 
             if not product_elements:
                 print(f"   ⚠️ No product elements found on page {page}")
-                break
+                # Enhanced debugging for failing categories
+                print("   🔍 DEBUGGING: Looking for any potential product containers...")
+                
+                debug_selectors = [
+                    "*[class*='pt__content']",
+                    "*[class*='product']",
+                    "*[class*='pt']", 
+                    "*[class*='tile']",
+                    "*[class*='item']",
+                    "*[class*='card']"
+                ]
+                
+                for debug_selector in debug_selectors:
+                    elements = driver.find_elements(By.CSS_SELECTOR, debug_selector)
+                    if elements:
+                        print(f"   🔍 Found {len(elements)} elements matching '{debug_selector}'")
+                        # Show first few class names for the failing categories
+                        for i, elem in enumerate(elements[:5]):
+                            try:
+                                class_name = elem.get_attribute('class')
+                                print(f"   🔍 Element {i+1} classes: {class_name}")
+                            except:
+                                pass
+                        # Let's try using the first debug selector that finds elements
+                        if len(elements) > 5:  # Reasonable number for products
+                            print(f"   🎯 Using debug selector: {debug_selector}")
+                            product_elements = elements
+                            break
+                
+                if not product_elements:
+                    break
 
             page_products = []
             
             for product in product_elements:
                 try:
-                    # Product name - correct selector from HTML
-                    try:
-                        name_elem = product.find_element(By.CSS_SELECTOR, ".pt__link")
-                        name = name_elem.text.strip()
-                    except:
-                        name = None
+                    # Enhanced product name extraction with multiple selectors
+                    name_selectors = [
+                        ".pt__link",                          # Primary selector
+                        ".pt__info__description a",           # Alternative with description
+                        "[data-testid='product-tile-description'] a",  # Testid approach
+                        "h2 a",                               # Generic heading link
+                        "a[title]",                           # Any link with title attribute
+                        ".pt__info a"                         # Info section link
+                    ]
+                    
+                    name = None
+                    full_title = None
+                    
+                    for name_selector in name_selectors:
+                        try:
+                            name_elem = product.find_element(By.CSS_SELECTOR, name_selector)
+                            name = name_elem.text.strip()
+                            # Also get the title attribute for full name if text is truncated
+                            full_title = name_elem.get_attribute('title')
+                            if name:
+                                # Use full title if name appears truncated (ends with ...)
+                                if name.endswith('...') and full_title and len(full_title) > len(name):
+                                    name = full_title.strip()
+                                break
+                        except:
+                            continue
                     
                     if not name:
                         continue
                     
-                    # Regular price - correct selector from HTML
-                    try:
-                        price_elem = product.find_element(By.CSS_SELECTOR, '[data-testid="pt-retail-price"]')
-                        price_text = price_elem.text.strip()
-                        price_match = re.search(r'£[\d.]+', price_text)
-                        price = price_match.group() if price_match else "N/A"
-                    except:
-                        price = "N/A"
+                    # Enhanced price extraction with multiple approaches
+                    price_selectors = [
+                        '[data-testid="pt-retail-price"]',         # Primary selector
+                        '.pt__cost__retail-price',                 # Alternative class
+                        '*[class*="retail-price"]',                # Any retail price class
+                        '.pt__cost span:first-child',              # First span in cost section
+                        '*[class*="price"]:not([class*="unit"])'   # Any price class except unit price
+                    ]
+                    
+                    price = "N/A"
+                    for price_selector in price_selectors:
+                        try:
+                            price_elem = product.find_element(By.CSS_SELECTOR, price_selector)
+                            price_text = price_elem.text.strip()
+                            # Enhanced price regex to catch different formats
+                            price_match = re.search(r'£[\d.,]+|\d+p', price_text)
+                            if price_match:
+                                price = price_match.group()
+                                break
+                        except:
+                            continue
 
-                    # Nectar price - handle cases where it doesn't exist
+                    # Enhanced Nectar price extraction
                     nectar_price = "N/A"
                     try:
                         # Check if there's a contextual price wrapper first
@@ -531,7 +600,7 @@ def scrape_category(driver, url):
                             try:
                                 nectar_elem = product.find_element(By.CSS_SELECTOR, '[data-testid="contextual-price-text"]')
                                 nectar_text = nectar_elem.text.strip()
-                                nectar_match = re.search(r'£[\d.]+', nectar_text)
+                                nectar_match = re.search(r'£[\d.,]+|\d+p', nectar_text)
                                 if nectar_match:
                                     nectar_price = nectar_match.group()
                             except:
@@ -548,7 +617,9 @@ def scrape_category(driver, url):
                             "Price with Nectar": nectar_price
                         }
                         page_products.append(product_data)
-                except Exception:
+                except Exception as e:
+                    # Enhanced error logging for debugging
+                    print(f"   ⚠️ Error processing product: {e}")
                     continue
 
             print(f"   ✅ Found {len(page_products)} products on page {page}")
