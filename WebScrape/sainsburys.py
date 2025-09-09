@@ -149,12 +149,11 @@ def kill_chrome_processes():
             try:
                 if any(name in proc.info['name'].lower() for name in ['chrome', 'chromedriver']):
                     proc.kill()
-                    print(f"Killed process: {proc.info['name']} (PID: {proc.info['pid']})")
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 pass
         time.sleep(1)
-    except Exception as e:
-        print(f"Error killing processes: {e}")
+    except Exception:
+        pass
 
 def get_chrome_version():
     """Get Chrome version for both Windows and Linux"""
@@ -169,9 +168,7 @@ def get_chrome_version():
                 if result.returncode == 0:
                     version_match = re.search(r'(\d+)\.(\d+)\.(\d+)\.(\d+)', result.stdout)
                     if version_match:
-                        full_version = version_match.group(0)
                         major_version = int(version_match.group(1))
-                        print(f"Detected Chrome version: {full_version} (major: {major_version})")
                         return major_version
             except:
                 pass
@@ -185,24 +182,19 @@ def get_chrome_version():
                 if result.returncode == 0:
                     version_match = re.search(r'(\d+)\.(\d+)\.(\d+)\.(\d+)', result.stdout)
                     if version_match:
-                        full_version = version_match.group(0)
                         major_version = int(version_match.group(1))
-                        print(f"Detected Chrome version: {full_version} (major: {major_version})")
                         return major_version
             except:
                 pass
         
-        print("Could not detect Chrome version - will use auto-detection")
         return None
         
-    except Exception as e:
-        print(f"Error detecting Chrome version: {e}")
+    except Exception:
         return None
 
 def cleanup_chromedriver_files():
     """Cleanup ChromeDriver files for both environments"""
     try:
-        print("🧹 Starting comprehensive ChromeDriver cleanup...")
         kill_chrome_processes()
         
         is_github = detect_environment()
@@ -230,18 +222,15 @@ def cleanup_chromedriver_files():
                 try:
                     if os.path.isfile(path):
                         os.remove(path)
-                        print(f"   ✅ Removed file: {path}")
                     else:
                         shutil.rmtree(path)
-                        print(f"   ✅ Removed directory: {path}")
-                except Exception as e:
-                    print(f"   ⚠️ Could not remove {path}: {e}")
+                except Exception:
+                    pass
         
-        print("✅ ChromeDriver cleanup completed")
         time.sleep(1)
         
-    except Exception as e:
-        print(f"Error during cleanup: {e}")
+    except Exception:
+        pass
 
 def setup_optimized_driver():
     """Setup Chrome driver optimized for both local and GitHub Actions"""
@@ -249,8 +238,6 @@ def setup_optimized_driver():
     
     is_github = detect_environment()
     chrome_version = get_chrome_version()
-    
-    print(f"Detected Chrome version: {chrome_version}")
     
     # Create fresh options for each attempt
     def create_fresh_options():
@@ -298,41 +285,33 @@ def setup_optimized_driver():
                     version_main=None  # Let it auto-detect
                 )
                 driver.delete_all_cookies()
-                print("✅ Driver created successfully with explicit path")
                 return driver
-            except Exception as e:
-                print(f"Failed with explicit path: {e}")
+            except Exception:
+                pass
         
         # Strategy 2: Auto-detection with version_main=None
         try:
-            print("Attempting auto-detection with version_main=None...")
             options = create_fresh_options()
             driver = uc.Chrome(version_main=None, options=options)
             driver.delete_all_cookies()
-            print("✅ Driver created successfully with auto-detection")
             return driver
-        except Exception as e:
-            print(f"Failed with auto-detection: {e}")
+        except Exception:
+            pass
         
         # Strategy 3: Try with compatible versions
         compatible_versions = [140, 139, 129, 130, 131]
         for version in compatible_versions:
             try:
-                print(f"Trying Chrome version {version}...")
                 options = create_fresh_options()
                 driver = uc.Chrome(version_main=version, options=options)
                 driver.delete_all_cookies()
-                print(f"✅ Driver created with Chrome version {version}")
                 return driver
-            except Exception as e:
-                print(f"Failed with version {version}: {e}")
+            except Exception:
                 continue
         
-        print("❌ All driver creation attempts failed")
         return None
         
-    except Exception as e:
-        print(f"Failed to create driver: {e}")
+    except Exception:
         return None
 
 def handle_cookies_once(driver):
@@ -353,17 +332,14 @@ def handle_cookies_once(driver):
                     EC.element_to_be_clickable((By.XPATH, selector))
                 )
                 cookie_button.click()
-                print("   🍪 Accepted cookies")
                 time.sleep(1)
                 return True
             except:
                 continue
         
-        print("   ℹ️ No cookie banner found")
         return False
         
-    except Exception as e:
-        print(f"   ⚠️ Cookie handling error: {e}")
+    except Exception:
         return False
 
 def check_pagination_and_duplicates(driver, current_page_products, all_seen_products):
@@ -374,7 +350,6 @@ def check_pagination_and_duplicates(driver, current_page_products, all_seen_prod
     overlap = current_product_names.intersection(all_seen_products)
     
     if len(overlap) > len(current_page_products) * 0.9:  # 90% overlap
-        print(f"   🔄 Detected {len(overlap)} duplicate products - likely reached end")
         return True
     
     # Check pagination buttons
@@ -391,7 +366,6 @@ def check_pagination_and_duplicates(driver, current_page_products, all_seen_prod
             try:
                 disabled_button = driver.find_element(By.CSS_SELECTOR, selector)
                 if disabled_button:
-                    print("   ✅ Next button is disabled - reached last page")
                     return True
             except:
                 continue
@@ -412,16 +386,58 @@ def check_pagination_and_duplicates(driver, current_page_products, all_seen_prod
                 continue
         
         if not has_enabled_next:
-            print("   ✅ No enabled next button found - reached last page")
             return True
-        else:
-            print("   ➡️ Next button is enabled - checking for actual new content")
     
-    except Exception as e:
-        print(f"   ⚠️ Error checking pagination: {e}")
+    except Exception:
         return True
     
     return False
+
+def retry_page_with_longer_wait(driver, url, page_num, max_retries=2):
+    """Retry a page with progressively longer waits if no products found initially"""
+    wait_times = [3.0, 5.0, 8.0]  # Progressive wait times in seconds
+    
+    for retry in range(max_retries + 1):
+        try:
+            if retry > 0:
+                driver.get(url)
+                time.sleep(wait_times[retry-1])  # Longer wait for retry
+            
+            # Try to find products with multiple selectors
+            product_elements = []
+            
+            # Enhanced selector approach for retries
+            selectors_to_try = [
+                ".pt__content",
+                ".pt__content--with-header", 
+                "*[class*='pt__content']",
+                ".pt-grid-item .pt__content",
+                ".ln-c-card.pt",
+                "article.pt"
+            ]
+            
+            for selector in selectors_to_try:
+                try:
+                    elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                    if elements:
+                        product_elements = elements
+                        break
+                except:
+                    continue
+            
+            if product_elements:
+                return product_elements
+            elif retry < max_retries:
+                continue
+            else:
+                return []
+                
+        except Exception:
+            if retry == max_retries:
+                return []
+            continue
+    
+    return []
 
 def scrape_category(driver, url):
     """Scrape all pages from a category"""
@@ -444,8 +460,6 @@ def scrape_category(driver, url):
         except:
             category_name = "unknown"
 
-    print(f"🛒 Starting category: {category_name}")
-
     while page <= max_pages:
         try:
             if page == 1:
@@ -453,12 +467,7 @@ def scrape_category(driver, url):
             else:
                 paged_url = f"{url}/opt/page:{page}"
             
-            print(f"   📄 Scraping page {page}...")
             driver.get(paged_url)
-            
-            # Debug: Check what's actually on the page
-            print(f"   🔍 Page title: {driver.title}")
-            print(f"   🔍 Current URL: {driver.current_url}")
 
             if page == 1:
                 handle_cookies_once(driver)
@@ -469,75 +478,97 @@ def scrape_category(driver, url):
             try:
                 body_text = driver.find_element(By.TAG_NAME, "body").text
                 if "blocked" in body_text.lower() or "captcha" in body_text.lower():
-                    print(f"   🚫 Page appears to be blocked or showing CAPTCHA")
                     break
             except:
                 pass
 
-            # Try multiple selectors for product containers - updated for both patterns
-            product_selectors = [
-                ".pt__content",           # Direct content divs (first pattern)
-                ".pt-grid-item",          # Grid items containing products (second pattern)  
-                "article.pt",             # Article elements (second pattern)
-                ".ln-c-card.pt",          # Card elements (second pattern)
-            ]
-
-            product_elements = []
-            for selector in product_selectors:
-                try:
-                    WebDriverWait(driver, 10).until(
-                        EC.presence_of_all_elements_located((By.CSS_SELECTOR, selector))
-                    )
-                    product_elements = driver.find_elements(By.CSS_SELECTOR, selector)
-                    if product_elements:
-                        print(f"   ✅ Found {len(product_elements)} products using selector: {selector}")
-                        break
-                except:
-                    continue
+            # Use the original simple approach that was working
+            try:
+                product_elements = driver.find_elements(By.CSS_SELECTOR, ".pt__content")
+                if not product_elements:
+                    # Only try alternatives if main selector finds nothing
+                    alternative_selectors = [
+                        ".pt__content--with-header",
+                        "*[class*='pt__content']",
+                        ".pt-grid-item .pt__content"
+                    ]
+                    
+                    for selector in alternative_selectors:
+                        try:
+                            elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                            if elements:
+                                product_elements = elements
+                                break
+                        except:
+                            continue
+            except:
+                pass
 
             if not product_elements:
-                print(f"   ⚠️ No product elements found on page {page}")
                 break
 
             page_products = []
             
             for product in product_elements:
                 try:
-                    # Product name - correct selector from HTML
+                    # Enhanced product name - handle truncated names
                     try:
                         name_elem = product.find_element(By.CSS_SELECTOR, ".pt__link")
                         name = name_elem.text.strip()
+                        
+                        # Handle truncated names with full title
+                        full_title = name_elem.get_attribute('title')
+                        if name.endswith('...') and full_title and len(full_title) > len(name):
+                            name = full_title.strip()
+                        elif not name and full_title:
+                            name = full_title.strip()
                     except:
-                        name = None
+                        continue
                     
                     if not name:
                         continue
                     
-                    # Regular price - correct selector from HTML
+                    # Enhanced price extraction - include pence prices with fallbacks
                     try:
                         price_elem = product.find_element(By.CSS_SELECTOR, '[data-testid="pt-retail-price"]')
                         price_text = price_elem.text.strip()
-                        price_match = re.search(r'£[\d.]+', price_text)
+                        # Enhanced regex to catch £X.XX, £X, and Xp formats
+                        price_match = re.search(r'£[\d.,]+|\d+p', price_text)
                         price = price_match.group() if price_match else "N/A"
                     except:
+                        # Fallback price selectors
                         price = "N/A"
+                        price_selectors = [
+                            '.pt__cost__retail-price',
+                            '*[class*="retail-price"]',
+                            '.pt__cost span:first-child'
+                        ]
+                        
+                        for price_selector in price_selectors:
+                            try:
+                                price_elem = product.find_element(By.CSS_SELECTOR, price_selector)
+                                price_text = price_elem.text.strip()
+                                price_match = re.search(r'£[\d.,]+|\d+p', price_text)
+                                if price_match:
+                                    price = price_match.group()
+                                    break
+                            except:
+                                continue
 
-                    # Nectar price - handle cases where it doesn't exist
+                    # Nectar price - keep original logic
                     nectar_price = "N/A"
                     try:
-                        # Check if there's a contextual price wrapper first
                         contextual_wrapper = product.find_element(By.CSS_SELECTOR, '[data-testid="whole-contextual-price"]')
                         if contextual_wrapper:
                             try:
                                 nectar_elem = product.find_element(By.CSS_SELECTOR, '[data-testid="contextual-price-text"]')
                                 nectar_text = nectar_elem.text.strip()
-                                nectar_match = re.search(r'£[\d.]+', nectar_text)
+                                nectar_match = re.search(r'£[\d.,]+|\d+p', nectar_text)
                                 if nectar_match:
                                     nectar_price = nectar_match.group()
                             except:
                                 pass
                     except:
-                        # No contextual price wrapper means no Nectar price available
                         pass
 
                     if name and price != "N/A":
@@ -548,14 +579,12 @@ def scrape_category(driver, url):
                             "Price with Nectar": nectar_price
                         }
                         page_products.append(product_data)
+                        
                 except Exception:
                     continue
 
-            print(f"   ✅ Found {len(page_products)} products on page {page}")
-
             # Check for end conditions
             if check_pagination_and_duplicates(driver, page_products, all_seen_product_names):
-                print(f"   🏁 Reached last page for {category_name}")
                 break
 
             # Add new products only
@@ -570,30 +599,25 @@ def scrape_category(driver, url):
             # Track consecutive pages with no new products
             if len(new_products) == 0:
                 consecutive_duplicate_pages += 1
-                print(f"   ⚠️ No new products on page {page} (consecutive: {consecutive_duplicate_pages})")
-                if consecutive_duplicate_pages >= 5:
-                    print(f"   🛑 Stopping due to {consecutive_duplicate_pages} consecutive pages with no new products")
+                if consecutive_duplicate_pages >= 3:  # Reduced from 5 to 3 for efficiency
                     break
             else:
                 consecutive_duplicate_pages = 0
-                print(f"   ➕ Added {len(new_products)} new products")
 
             page += 1
             # Shorter delays for GitHub Actions
             time.sleep(random.uniform(0.5, 1.0))
 
-        except Exception as e:
-            print(f"   ❌ Error on page {page}: {e}")
+        except Exception:
             break
 
-    print(f"✅ Category {category_name} completed: {len(products)} total unique products\n")
+    print(f"✅ {category_name}: {len(products)} products")
     return products
 
 def scrape_single_category(url):
     """Run one category scrape"""
     driver = setup_optimized_driver()
     if not driver:
-        print(f"❌ Failed to create driver for {url}")
         return []
 
     try:
@@ -611,13 +635,11 @@ def scrape_all_categories():
     all_products = []
     
     for i, url in enumerate(CATEGORY_URLS, 1):
-        print(f"\n📊 Progress: Starting {i}/{len(CATEGORY_URLS)} categories")
         try:
             products = scrape_single_category(url)
             all_products.extend(products)
-            print(f"📊 Progress: {i}/{len(CATEGORY_URLS)} categories completed")
-        except Exception as e:
-            print(f"❌ Error scraping category {url}: {e}")
+        except Exception:
+            pass
         
         # Shorter delays for GitHub Actions
         if i < len(CATEGORY_URLS):
@@ -628,7 +650,6 @@ def scrape_all_categories():
 def save_products(products):
     """Save scraped data to CSV files"""
     if not products:
-        print("❌ No products found.")
         return
 
     fieldnames = ["Category", "Product Name", "Price", "Price with Nectar"]
@@ -646,16 +667,13 @@ def save_products(products):
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(products)
-        print(f"✅ Files saved: {OUTPUT_FILE} (local) and {APP_OUTPUT_FILE}")
     except:
-        print(f"✅ File saved: {OUTPUT_FILE}")
+        pass
 
 def main():
     env = "GitHub Actions" if detect_environment() else "Local"
-    print(f"🛒 Starting Sainsbury's scraper ({env})...")
-    print(f"📋 Categories to scrape: {len(CATEGORY_URLS)}")
-    print(f"🧵 Processing: Sequential")
-    print(f"🛑 Safety: Max 50 pages per category\n")
+    print(f"🛒 Starting Sainsbury's scraper ({env})")
+    print(f"📋 Categories: {len(CATEGORY_URLS)} | Processing: Sequential")
 
     start_time = time.time()
     products = scrape_all_categories()
@@ -663,13 +681,9 @@ def main():
 
     save_products(products)
 
-    print("\n" + "="*60)
-    print("🎉 SCRAPING COMPLETED!")
+    print(f"\n🎉 COMPLETED!")
     print(f"📊 Total products: {len(products)}")
-    print(f"⏱️ Total time: {elapsed:.2f} seconds")
-    if products:
-        print(f"🚀 Products per second: {len(products)/elapsed:.2f}")
-    print("="*60)
+    print(f"⏱️ Time: {elapsed:.0f}s | Speed: {len(products)/elapsed:.1f} products/sec")
 
 if __name__ == "__main__":
     main()
