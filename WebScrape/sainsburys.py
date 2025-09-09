@@ -531,14 +531,23 @@ def scrape_category(driver, url):
                     except:
                         price = "N/A"
 
-                    # Nectar price - correct selector from HTML
+                    # Nectar price - handle cases where it doesn't exist
+                    nectar_price = "N/A"
                     try:
-                        nectar_elem = product.find_element(By.CSS_SELECTOR, '[data-testid="contextual-price-text"]')
-                        nectar_text = nectar_elem.text.strip()
-                        nectar_match = re.search(r'£[\d.]+', nectar_text)
-                        nectar_price = nectar_match.group() if nectar_match else "N/A"
+                        # Check if there's a contextual price wrapper first
+                        contextual_wrapper = product.find_element(By.CSS_SELECTOR, '[data-testid="whole-contextual-price"]')
+                        if contextual_wrapper:
+                            try:
+                                nectar_elem = product.find_element(By.CSS_SELECTOR, '[data-testid="contextual-price-text"]')
+                                nectar_text = nectar_elem.text.strip()
+                                nectar_match = re.search(r'£[\d.]+', nectar_text)
+                                if nectar_match:
+                                    nectar_price = nectar_match.group()
+                            except:
+                                pass
                     except:
-                        nectar_price = "N/A"
+                        # No contextual price wrapper means no Nectar price available
+                        pass
 
                     if name and price != "N/A":
                         product_data = {
