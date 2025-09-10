@@ -20,6 +20,9 @@ uc.Chrome.__del__ = lambda self: None
 MAX_THREADS = 1  # Sequential for GitHub Actions stability
 BASE_URL = "https://www.sainsburys.co.uk"
 
+# Global driver management
+WORKING_DRIVER_CONFIG = None
+
 CATEGORY_URLS = [
     "https://www.sainsburys.co.uk/gol-ui/groceries/frozen/chips-potatoes-and-rice/c:1019895",
     "https://www.sainsburys.co.uk/gol-ui/groceries/frozen/desserts-and-pastry/c:1019902",
@@ -149,12 +152,11 @@ def kill_chrome_processes():
             try:
                 if any(name in proc.info['name'].lower() for name in ['chrome', 'chromedriver']):
                     proc.kill()
-                    print(f"Killed process: {proc.info['name']} (PID: {proc.info['pid']})")
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 pass
         time.sleep(1)
-    except Exception as e:
-        print(f"Error killing processes: {e}")
+    except Exception:
+        pass
 
 def get_chrome_version():
     """Get Chrome version for both Windows and Linux"""
@@ -169,9 +171,7 @@ def get_chrome_version():
                 if result.returncode == 0:
                     version_match = re.search(r'(\d+)\.(\d+)\.(\d+)\.(\d+)', result.stdout)
                     if version_match:
-                        full_version = version_match.group(0)
                         major_version = int(version_match.group(1))
-                        print(f"Detected Chrome version: {full_version} (major: {major_version})")
                         return major_version
             except:
                 pass
@@ -185,24 +185,19 @@ def get_chrome_version():
                 if result.returncode == 0:
                     version_match = re.search(r'(\d+)\.(\d+)\.(\d+)\.(\d+)', result.stdout)
                     if version_match:
-                        full_version = version_match.group(0)
                         major_version = int(version_match.group(1))
-                        print(f"Detected Chrome version: {full_version} (major: {major_version})")
                         return major_version
             except:
                 pass
         
-        print("Could not detect Chrome version - will use auto-detection")
         return None
         
-    except Exception as e:
-        print(f"Error detecting Chrome version: {e}")
+    except Exception:
         return None
 
 def cleanup_chromedriver_files():
     """Cleanup ChromeDriver files for both environments"""
     try:
-        print("🧹 Starting comprehensive ChromeDriver cleanup...")
         kill_chrome_processes()
         
         is_github = detect_environment()
@@ -230,29 +225,47 @@ def cleanup_chromedriver_files():
                 try:
                     if os.path.isfile(path):
                         os.remove(path)
-                        print(f"   ✅ Removed file: {path}")
                     else:
                         shutil.rmtree(path)
-                        print(f"   ✅ Removed directory: {path}")
-                except Exception as e:
-                    print(f"   ⚠️ Could not remove {path}: {e}")
+                except Exception:
+                    pass
         
-        print("✅ ChromeDriver cleanup completed")
         time.sleep(1)
         
-    except Exception as e:
-        print(f"Error during cleanup: {e}")
+    except Exception:
+        pass
 
 def setup_optimized_driver():
     """Setup Chrome driver optimized for both local and GitHub Actions"""
+    global WORKING_DRIVER_CONFIG
+    
+    # If we have a working config, use it directly
+    if WORKING_DRIVER_CONFIG:
+        try:
+            options = create_fresh_options()
+            if WORKING_DRIVER_CONFIG['type'] == 'explicit_path':
+                driver = uc.Chrome(
+                    driver_executable_path='/usr/local/bin/chromedriver',
+                    options=options,
+                    version_main=None
+                )
+            elif WORKING_DRIVER_CONFIG['type'] == 'auto_detect':
+                driver = uc.Chrome(version_main=None, options=options)
+            else:  # version_specific
+                driver = uc.Chrome(version_main=WORKING_DRIVER_CONFIG['version'], options=options)
+            
+            driver.delete_all_cookies()
+            return driver
+        except Exception:
+            # Reset if previously working config fails
+            WORKING_DRIVER_CONFIG = None
+    
+    # Original driver setup logic if no working config
     cleanup_chromedriver_files()
     
     is_github = detect_environment()
     chrome_version = get_chrome_version()
     
-    print(f"Detected Chrome version: {chrome_version}")
-    
-    # Create fresh options for each attempt
     def create_fresh_options():
         options = uc.ChromeOptions()
         
@@ -266,25 +279,33 @@ def setup_optimized_driver():
         options.add_argument("--allow-running-insecure-content")
         options.add_argument("--disable-features=VizDisplayCompositor")
         
-        # Environment-specific options
+        # Disable images and media for faster loading
+        prefs = {
+            "profile.managed_default_content_settings.images": 2,
+            "profile.managed_default_content_settings.media_stream": 2,
+            "profile.default_content_setting_values.notifications": 2,
+            "profile.managed_default_content_settings.geolocation": 2,
+        }
+        options.add_experimental_option("prefs", prefs)
+        
+        # Additional performance options
+        options.add_argument("--disable-plugins")
+        options.add_argument("--disable-background-networking")
+        options.add_argument("--disable-sync")
+        options.add_argument("--disable-translate")
+        options.add_argument("--disable-features=TranslateUI")
+        options.add_argument("--aggressive-cache-discard")
+        options.add_argument("--disable-background-timer-throttling")
+        
         if is_github:
-            # GitHub Actions specific
             options.add_argument("--headless")
-            options.add_argument("--disable-background-timer-throttling")
             options.add_argument("--disable-renderer-backgrounding")
             options.add_argument("--disable-backgrounding-occluded-windows")
-            options.add_argument("--disable-features=TranslateUI")
             options.add_argument("--window-size=1920,1080")
-            # Disable images for speed
-            prefs = {"profile.managed_default_content_settings.images": 2}
-            options.add_experimental_option("prefs", prefs)
         else:
-            # Local development
             options.add_argument("--start-maximized")
         
-        # User agent
         options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36")
-        
         return options
 
     try:
@@ -295,45 +316,84 @@ def setup_optimized_driver():
                 driver = uc.Chrome(
                     driver_executable_path='/usr/local/bin/chromedriver',
                     options=options,
-                    version_main=None  # Let it auto-detect
+                    version_main=None
                 )
                 driver.delete_all_cookies()
-                print("✅ Driver created successfully with explicit path")
+                WORKING_DRIVER_CONFIG = {'type': 'explicit_path'}
                 return driver
-            except Exception as e:
-                print(f"Failed with explicit path: {e}")
+            except Exception:
+                pass
         
         # Strategy 2: Auto-detection with version_main=None
         try:
-            print("Attempting auto-detection with version_main=None...")
             options = create_fresh_options()
             driver = uc.Chrome(version_main=None, options=options)
             driver.delete_all_cookies()
-            print("✅ Driver created successfully with auto-detection")
+            WORKING_DRIVER_CONFIG = {'type': 'auto_detect'}
             return driver
-        except Exception as e:
-            print(f"Failed with auto-detection: {e}")
+        except Exception:
+            pass
         
         # Strategy 3: Try with compatible versions
         compatible_versions = [140, 139, 129, 130, 131]
         for version in compatible_versions:
             try:
-                print(f"Trying Chrome version {version}...")
                 options = create_fresh_options()
                 driver = uc.Chrome(version_main=version, options=options)
                 driver.delete_all_cookies()
-                print(f"✅ Driver created with Chrome version {version}")
+                WORKING_DRIVER_CONFIG = {'type': 'version_specific', 'version': version}
                 return driver
-            except Exception as e:
-                print(f"Failed with version {version}: {e}")
+            except Exception:
                 continue
         
-        print("❌ All driver creation attempts failed")
         return None
         
-    except Exception as e:
-        print(f"Failed to create driver: {e}")
+    except Exception:
         return None
+
+def create_fresh_options():
+    """Create fresh Chrome options - standalone function for reuse"""
+    is_github = detect_environment()
+    options = uc.ChromeOptions()
+    
+    # Common options
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-web-security")
+    options.add_argument("--allow-running-insecure-content")
+    options.add_argument("--disable-features=VizDisplayCompositor")
+    
+    # Disable images and media for faster loading
+    prefs = {
+        "profile.managed_default_content_settings.images": 2,
+        "profile.managed_default_content_settings.media_stream": 2,
+        "profile.default_content_setting_values.notifications": 2,
+        "profile.managed_default_content_settings.geolocation": 2,
+    }
+    options.add_experimental_option("prefs", prefs)
+    
+    # Additional performance options
+    options.add_argument("--disable-plugins")
+    options.add_argument("--disable-background-networking")
+    options.add_argument("--disable-sync")
+    options.add_argument("--disable-translate")
+    options.add_argument("--disable-features=TranslateUI")
+    options.add_argument("--aggressive-cache-discard")
+    options.add_argument("--disable-background-timer-throttling")
+    
+    if is_github:
+        options.add_argument("--headless")
+        options.add_argument("--disable-renderer-backgrounding")
+        options.add_argument("--disable-backgrounding-occluded-windows")
+        options.add_argument("--window-size=1920,1080")
+    else:
+        options.add_argument("--start-maximized")
+    
+    options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36")
+    return options
 
 def handle_cookies_once(driver):
     """Handle cookies banner if present"""
@@ -353,52 +413,62 @@ def handle_cookies_once(driver):
                     EC.element_to_be_clickable((By.XPATH, selector))
                 )
                 cookie_button.click()
-                print("   🍪 Accepted cookies")
                 time.sleep(1)
                 return True
             except:
                 continue
         
-        print("   ℹ️ No cookie banner found")
         return False
         
-    except Exception as e:
-        print(f"   ⚠️ Cookie handling error: {e}")
+    except Exception:
         return False
 
-def scroll_to_load_all_products(driver, max_scrolls=5):
-    """Scroll down to load all products with lazy loading"""
+def scroll_to_load_all_products(driver, max_scrolls=3):
+    """Scroll down to load all products with lazy loading - safer version"""
     try:
+        # Check if driver is still responsive
+        try:
+            driver.current_url
+        except Exception:
+            return False
+            
         # Get initial page height
         last_height = driver.execute_script("return document.body.scrollHeight")
         scrolls = 0
         
         while scrolls < max_scrolls:
-            # Scroll down to bottom
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            
-            # Wait for new content to load
-            time.sleep(2)
-            
-            # Calculate new scroll height and compare to last height
-            new_height = driver.execute_script("return document.body.scrollHeight")
-            
-            # If height hasn't changed, we've reached the end
-            if new_height == last_height:
-                break
+            try:
+                # Scroll down more gradually
+                driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
+                time.sleep(1)
+                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                 
-            last_height = new_height
-            scrolls += 1
+                # Wait for new content to load
+                time.sleep(2)
+                
+                # Calculate new scroll height and compare to last height
+                new_height = driver.execute_script("return document.body.scrollHeight")
+                
+                # If height hasn't changed, we've reached the end
+                if new_height == last_height:
+                    break
+                    
+                last_height = new_height
+                scrolls += 1
+                
+            except Exception as e:
+                break
         
         # Scroll back to top for consistent scraping start point
-        driver.execute_script("window.scrollTo(0, 0);")
-        time.sleep(1)
+        try:
+            driver.execute_script("window.scrollTo(0, 0);")
+            time.sleep(1)
+        except:
+            pass
         
-        print(f"   📜 Scrolled {scrolls} times to load all products")
         return True
         
-    except Exception as e:
-        print(f"   ⚠️ Error during scrolling: {e}")
+    except Exception:
         return False
 
 def check_pagination_and_duplicates(driver, current_page_products, all_seen_products):
@@ -409,7 +479,6 @@ def check_pagination_and_duplicates(driver, current_page_products, all_seen_prod
     overlap = current_product_names.intersection(all_seen_products)
     
     if len(overlap) > len(current_page_products) * 0.9:  # 90% overlap
-        print(f"   🔄 Detected {len(overlap)} duplicate products - likely reached end")
         return True
     
     # Check pagination buttons
@@ -426,7 +495,6 @@ def check_pagination_and_duplicates(driver, current_page_products, all_seen_prod
             try:
                 disabled_button = driver.find_element(By.CSS_SELECTOR, selector)
                 if disabled_button:
-                    print("   ✅ Next button is disabled - reached last page")
                     return True
             except:
                 continue
@@ -447,13 +515,9 @@ def check_pagination_and_duplicates(driver, current_page_products, all_seen_prod
                 continue
         
         if not has_enabled_next:
-            print("   ✅ No enabled next button found - reached last page")
             return True
-        else:
-            print("   ➡️ Next button is enabled - checking for actual new content")
     
-    except Exception as e:
-        print(f"   ⚠️ Error checking pagination: {e}")
+    except Exception:
         return True
     
     return False
@@ -479,8 +543,6 @@ def scrape_category(driver, url):
         except:
             category_name = "unknown"
 
-    print(f"🛒 Starting category: {category_name}")
-
     while page <= max_pages:
         try:
             if page == 1:
@@ -488,59 +550,69 @@ def scrape_category(driver, url):
             else:
                 paged_url = f"{url}/opt/page:{page}"
             
-            print(f"   📄 Scraping page {page}...")
             driver.get(paged_url)
-            
-            # Debug: Check what's actually on the page
-            print(f"   🔍 Page title: {driver.title}")
-            print(f"   🔍 Current URL: {driver.current_url}")
 
             if page == 1:
                 handle_cookies_once(driver)
 
-            time.sleep(random.uniform(1, 1.5))
+            time.sleep(random.uniform(0.5, 1.0))
 
             # Check for any content at all
             try:
                 body_text = driver.find_element(By.TAG_NAME, "body").text
                 if "blocked" in body_text.lower() or "captcha" in body_text.lower():
-                    print(f"   🚫 Page appears to be blocked or showing CAPTCHA")
                     break
             except:
                 pass
 
-            # Scroll to load all products before scraping
-            scroll_to_load_all_products(driver)
+            # Scroll to load all products before scraping (with crash protection)
+            scroll_success = scroll_to_load_all_products(driver)
+            if not scroll_success:
+                pass  # Continue without scroll
 
-            # Try multiple selectors for product containers - updated for both patterns
-            product_selectors = [
-                ".pt__content",           # Direct content divs (first pattern)
-                ".pt-grid-item",          # Grid items containing products (second pattern)  
-                "article.pt",             # Article elements (second pattern)
-                ".ln-c-card.pt",          # Card elements (second pattern)
-            ]
-
+            # Enhanced product container detection with multiple attempts
             product_elements = []
-            for selector in product_selectors:
+            
+            # Try multiple selector approaches
+            selector_attempts = [
+                ".pt__content",
+                ".pt-grid-item", 
+                "article.pt",
+                ".ln-c-card.pt",
+                "*[class*='pt__content']",
+                ".pt__content--with-header"
+            ]
+            
+            for selector in selector_attempts:
                 try:
-                    WebDriverWait(driver, 10).until(
-                        EC.presence_of_all_elements_located((By.CSS_SELECTOR, selector))
+                    # Wait for elements to be present
+                    WebDriverWait(driver, 5).until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, selector))
                     )
-                    product_elements = driver.find_elements(By.CSS_SELECTOR, selector)
-                    if product_elements:
-                        print(f"   ✅ Found {len(product_elements)} products using selector: {selector}")
+                    elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                    if elements:
+                        product_elements = elements
                         break
-                except:
+                except Exception:
                     continue
+            
+            # If still no products, try without WebDriverWait
+            if not product_elements:
+                for selector in selector_attempts:
+                    try:
+                        elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                        if elements:
+                            product_elements = elements
+                            break
+                    except Exception:
+                        continue
 
             if not product_elements:
-                print(f"   ⚠️ No product elements found on page {page}")
                 break
 
             # Initialize page_products list before extracting products
             page_products = []
             
-            # Enhanced product name - handle truncated names
             for product in product_elements:
                 try:
                     # Enhanced product name - handle truncated names
@@ -596,14 +668,12 @@ def scrape_category(driver, url):
                             "Price with Nectar": nectar_price
                         }
                         page_products.append(product_data)
+                        
                 except Exception:
                     continue
 
-            print(f"   ✅ Found {len(page_products)} products on page {page}")
-
             # Check for end conditions
             if check_pagination_and_duplicates(driver, page_products, all_seen_product_names):
-                print(f"   🏁 Reached last page for {category_name}")
                 break
 
             # Add new products only
@@ -618,30 +688,25 @@ def scrape_category(driver, url):
             # Track consecutive pages with no new products
             if len(new_products) == 0:
                 consecutive_duplicate_pages += 1
-                print(f"   ⚠️ No new products on page {page} (consecutive: {consecutive_duplicate_pages})")
-                if consecutive_duplicate_pages >= 5:
-                    print(f"   🛑 Stopping due to {consecutive_duplicate_pages} consecutive pages with no new products")
+                if consecutive_duplicate_pages >= 3:  # Reduced from 5 to 3 for efficiency
                     break
             else:
                 consecutive_duplicate_pages = 0
-                print(f"   ➕ Added {len(new_products)} new products")
 
             page += 1
             # Shorter delays for GitHub Actions
-            time.sleep(random.uniform(1, 1.5))
+            time.sleep(random.uniform(0.5, 1.0))
 
-        except Exception as e:
-            print(f"   ❌ Error on page {page}: {e}")
+        except Exception:
             break
 
-    print(f"✅ Category {category_name} completed: {len(products)} total unique products\n")
+    print(f"✅ {category_name}: {len(products)} products")
     return products
 
 def scrape_single_category(url):
-    """Run one category scrape"""
+    """Run one category scrape with driver reuse"""
     driver = setup_optimized_driver()
     if not driver:
-        print(f"❌ Failed to create driver for {url}")
         return []
 
     try:
@@ -652,31 +717,30 @@ def scrape_single_category(url):
             driver.quit()
         except:
             pass
-        time.sleep(1)  # Shorter cleanup delay
+        # Don't cleanup ChromeDriver files between categories if using working config
+        if not WORKING_DRIVER_CONFIG:
+            time.sleep(0.5)
 
 def scrape_all_categories():
     """Scrape all categories sequentially"""
     all_products = []
     
     for i, url in enumerate(CATEGORY_URLS, 1):
-        print(f"\n📊 Progress: Starting {i}/{len(CATEGORY_URLS)} categories")
         try:
             products = scrape_single_category(url)
             all_products.extend(products)
-            print(f"📊 Progress: {i}/{len(CATEGORY_URLS)} categories completed")
-        except Exception as e:
-            print(f"❌ Error scraping category {url}: {e}")
+        except Exception:
+            pass
         
         # Shorter delays for GitHub Actions
         if i < len(CATEGORY_URLS):
-            time.sleep(1)
+            time.sleep(0.5)
 
     return all_products
 
 def save_products(products):
     """Save scraped data to CSV files"""
     if not products:
-        print("❌ No products found.")
         return
 
     fieldnames = ["Category", "Product Name", "Price", "Price with Nectar"]
@@ -694,16 +758,13 @@ def save_products(products):
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(products)
-        print(f"✅ Files saved: {OUTPUT_FILE} (local) and {APP_OUTPUT_FILE}")
     except:
-        print(f"✅ File saved: {OUTPUT_FILE}")
+        pass
 
 def main():
     env = "GitHub Actions" if detect_environment() else "Local"
-    print(f"🛒 Starting Sainsbury's scraper ({env})...")
-    print(f"📋 Categories to scrape: {len(CATEGORY_URLS)}")
-    print(f"🧵 Processing: Sequential")
-    print(f"🛑 Safety: Max 50 pages per category\n")
+    print(f"🛒 Starting Sainsbury's scraper ({env})")
+    print(f"📋 Categories: {len(CATEGORY_URLS)} | Processing: Sequential")
 
     start_time = time.time()
     products = scrape_all_categories()
@@ -711,13 +772,9 @@ def main():
 
     save_products(products)
 
-    print("\n" + "="*60)
-    print("🎉 SCRAPING COMPLETED!")
+    print(f"\n🎉 COMPLETED!")
     print(f"📊 Total products: {len(products)}")
-    print(f"⏱️ Total time: {elapsed:.2f} seconds")
-    if products:
-        print(f"🚀 Products per second: {len(products)/elapsed:.2f}")
-    print("="*60)
+    print(f"⏱️ Time: {elapsed:.0f}s | Speed: {len(products)/elapsed:.1f} products/sec")
 
 if __name__ == "__main__":
     main()
