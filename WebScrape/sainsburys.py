@@ -55,6 +55,21 @@ def debug_product_structure(product_elements, category_name):
         except Exception as e:
             print_progress(f"   🔍 DEBUG error: {e}")
 
+def extract_parent_category_from_url(url):
+    """Extract the parent category name from URL"""
+    try:
+        # URL format: .../groceries/PARENT/SUBCATEGORY/c:1019895
+        parts = url.split('/')
+        groceries_index = parts.index('groceries')
+        
+        if groceries_index + 1 < len(parts):
+            parent_category = parts[groceries_index + 1]
+            return parent_category.replace('-', ' ')
+        
+        return "unknown"
+    except:
+        return "unknown"
+
 CATEGORY_URLS = [
     "https://www.sainsburys.co.uk/gol-ui/groceries/frozen/chips-potatoes-and-rice/c:1019895",
     "https://www.sainsburys.co.uk/gol-ui/groceries/frozen/desserts-and-pastry/c:1019902",
@@ -503,76 +518,14 @@ def scroll_to_load_all_products(driver, max_scrolls=3):
     except Exception:
         return False
 
-def check_pagination_and_duplicates(driver, current_page_products, all_seen_products):
-    """Check pagination status and detect duplicate content"""
-    
-    # Check for duplicate products
-    current_product_names = {p["Product Name"] for p in current_page_products}
-    overlap = current_product_names.intersection(all_seen_products)
-    
-    if len(overlap) > len(current_page_products) * 0.9:  # 90% overlap
-        return True
-    
-    # Check pagination buttons
-    try:
-        disabled_selectors = [
-            'button[rel="next"].ln-c-pagination__link.is-disabled',
-            'button[rel="next"][disabled]',
-            'button[rel="next"][aria-disabled="true"]',
-            '.ln-c-pagination__link[rel="next"].is-disabled',
-            '.ln-c-pagination__link[rel="next"][aria-disabled="true"]'
-        ]
-        
-        for selector in disabled_selectors:
-            try:
-                disabled_button = driver.find_element(By.CSS_SELECTOR, selector)
-                if disabled_button:
-                    return True
-            except:
-                continue
-        
-        enabled_selectors = [
-            'button[rel="next"]:not(.is-disabled):not([disabled]):not([aria-disabled="true"])',
-            '.ln-c-pagination__link[rel="next"]:not(.is-disabled):not([disabled]):not([aria-disabled="true"])'
-        ]
-        
-        has_enabled_next = False
-        for selector in enabled_selectors:
-            try:
-                enabled_button = driver.find_element(By.CSS_SELECTOR, selector)
-                if enabled_button and enabled_button.is_enabled():
-                    has_enabled_next = True
-                    break
-            except:
-                continue
-        
-        if not has_enabled_next:
-            return True
-    
-    except Exception:
-        return True
-    
-    return False
-
 def scrape_category(driver, url):
     """Scrape all pages from a category until next button is disabled"""
     products = []
     page = 1
     max_pages = 50
 
-    # Extract category name
-    url_parts = url.rstrip('/').split('/')
-    for i, part in enumerate(url_parts):
-        if part.startswith('c:'):
-            if i > 0:
-                category_name = url_parts[i-1]
-                break
-    else:
-        try:
-            category_name = url.split('/groceries/')[1].split('/')[0]
-        except:
-            category_name = "unknown"
-
+    # Extract parent category name from URL
+    category_name = extract_parent_category_from_url(url)
     print_progress(f"🛒 Starting category: {category_name}")
 
     while page <= max_pages:
@@ -652,18 +605,17 @@ def scrape_category(driver, url):
             
             for i, product in enumerate(product_elements):
                 try:
-                    # Extract product name
+                    # Extract product name using the exact selector from your HTML
                     name = ""
                     name_selectors = [
-                        ".pt__link",
-                        "a.pt__link", 
-                        ".pt__info .pt__link",
-                        ".pt__content .pt__link",
-                        "h3.pt__name a",
-                        ".pt__name a",
-                        "a[data-testid*='product-name']",
-                        "a[href*='/gol-ui/groceries/']",
-                        ".pt__content a",
+                        '.pt__info__description .pt__link',  # From your HTML structure
+                        '.pt__link',
+                        'a.pt__link', 
+                        '.pt__info .pt__link',
+                        '.pt__content .pt__link',
+                        'h2.pt__info__description a',
+                        'h2 a',
+                        "a[href*='/gol-ui/product/']",
                         "a[title]"
                     ]
                     
@@ -688,26 +640,21 @@ def scrape_category(driver, url):
                     if not name:
                         continue
                     
-                    # Extract price
+                    # Extract ONLY retail price (ignore Nectar prices completely)
                     price = "N/A"
-                    price_selectors = [
-                        '[data-testid="pt-retail-price"]',
-                        '.pt__cost .pt__cost__retail-price',
+                    retail_price_selectors = [
+                        '[data-testid="pt-retail-price"]',  # From your HTML - this is the £5.10
                         '.pt__cost__retail-price',
-                        '.pt__cost .ln-c-price',
-                        '.ln-c-price',
-                        '.pt__cost span:first-child',
-                        '.pt__cost',
-                        '*[class*="retail-price"]',
-                        '*[class*="price"]'
+                        '.pt__cost__retail-price--with-nectar-not-associated',
+                        '.pt__cost span[data-testid="pt-retail-price"]'
                     ]
                     
-                    for price_selector in price_selectors:
+                    for price_selector in retail_price_selectors:
                         try:
                             price_elem = product.find_element(By.CSS_SELECTOR, price_selector)
                             price_text = price_elem.text.strip()
                             
-                            # Enhanced regex to catch £X.XX, £X, and Xp formats
+                            # Extract price using regex
                             price_match = re.search(r'£[\d.,]+|\d+p', price_text)
                             if price_match:
                                 price = price_match.group()
@@ -715,45 +662,26 @@ def scrape_category(driver, url):
                         except:
                             continue
                     
-                    # If no price found, look for any element with price-like text
+                    # If no retail price found, try broader search but avoid contextual prices
                     if price == "N/A":
                         try:
-                            all_text = product.text
-                            price_match = re.search(r'£[\d.,]+|\d+p', all_text)
-                            if price_match:
-                                price = price_match.group()
+                            # Look for any price that's NOT in contextual price containers
+                            all_price_elements = product.find_elements(By.CSS_SELECTOR, '*[class*="price"]:not([data-testid="contextual-price-text"])')
+                            for elem in all_price_elements:
+                                price_text = elem.text.strip()
+                                price_match = re.search(r'£[\d.,]+|\d+p', price_text)
+                                if price_match:
+                                    price = price_match.group()
+                                    break
                         except:
                             pass
-
-                    # Extract Nectar price
-                    nectar_price = "N/A"
-                    try:
-                        nectar_selectors = [
-                            '[data-testid="contextual-price-text"]',
-                            '*[class*="contextual-price"]',
-                            '*[class*="nectar"]'
-                        ]
-                        
-                        for nectar_selector in nectar_selectors:
-                            try:
-                                nectar_elem = product.find_element(By.CSS_SELECTOR, nectar_selector)
-                                nectar_text = nectar_elem.text.strip()
-                                nectar_match = re.search(r'£[\d.,]+|\d+p', nectar_text)
-                                if nectar_match:
-                                    nectar_price = nectar_match.group()
-                                    break
-                            except:
-                                continue
-                    except:
-                        pass
 
                     # Add product if we have both name and price
                     if name and price != "N/A":
                         product_data = {
                             "Category": category_name,
                             "Product Name": name,
-                            "Price": price,
-                            "Price with Nectar": nectar_price
+                            "Price": price
                         }
                         page_products.append(product_data)
                         
@@ -845,7 +773,7 @@ def scrape_all_categories():
         
         # Shorter delays for GitHub Actions
         if i < len(CATEGORY_URLS):
-            time.sleep(0.3)  # Reduced from 0.5
+            time.sleep(0.3)
 
     return all_products
 
@@ -854,7 +782,7 @@ def save_products(products):
     if not products:
         return
 
-    fieldnames = ["Category", "Product Name", "Price", "Price with Nectar"]
+    fieldnames = ["Category", "Product Name", "Price"]  # Removed "Price with Nectar"
 
     # Save locally
     with open(OUTPUT_FILE, "w", newline="", encoding="utf-8") as f:
