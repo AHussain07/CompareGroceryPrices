@@ -23,6 +23,38 @@ BASE_URL = "https://www.sainsburys.co.uk"
 # Global driver management
 WORKING_DRIVER_CONFIG = None
 
+def print_progress(message, flush=True):
+    """Print with immediate flush for GitHub Actions visibility"""
+    print(message)
+    if flush:
+        import sys
+        sys.stdout.flush()
+
+def debug_product_structure(product_elements, category_name):
+    """Debug function to inspect product HTML structure"""
+    if len(product_elements) > 0:
+        try:
+            first_product = product_elements[0]
+            print_progress(f"   🔍 DEBUG for {category_name}:")
+            print_progress(f"   🔍 Product HTML (first 300 chars): {first_product.get_attribute('outerHTML')[:300]}")
+            
+            # Try to find any links
+            links = first_product.find_elements(By.TAG_NAME, "a")
+            print_progress(f"   🔍 Found {len(links)} links in product")
+            
+            if links:
+                first_link = links[0]
+                print_progress(f"   🔍 First link text: '{first_link.text.strip()}'")
+                print_progress(f"   🔍 First link href: '{first_link.get_attribute('href')}'")
+            
+            # Look for any price-like text
+            all_text = first_product.text
+            price_matches = re.findall(r'£[\d.,]+|\d+p', all_text)
+            print_progress(f"   🔍 Price-like text found: {price_matches}")
+            
+        except Exception as e:
+            print_progress(f"   🔍 DEBUG error: {e}")
+
 CATEGORY_URLS = [
     "https://www.sainsburys.co.uk/gol-ui/groceries/frozen/chips-potatoes-and-rice/c:1019895",
     "https://www.sainsburys.co.uk/gol-ui/groceries/frozen/desserts-and-pastry/c:1019902",
@@ -553,6 +585,8 @@ def scrape_category(driver, url):
                 paged_url = f"{url}/opt/page:{page}"
             
             print_progress(f"   📄 Scraping page {page}...")
+            print_progress(f"   🔍 Page title: {driver.title}")
+            print_progress(f"   🔍 Current URL: {driver.current_url}")
             driver.get(paged_url)
 
             if page == 1:
@@ -574,9 +608,9 @@ def scrape_category(driver, url):
             # Scroll to load all products before scraping (with crash protection)
             scroll_success = scroll_to_load_all_products(driver)
             if scroll_success:
-                print_progress(f"   📜 Scrolled to load all products")
+                print_progress(f"   📜 Scrolled {3} times to load all products")
             else:
-                print_progress(f"   ⚠️ Scrolling failed, continuing without scroll")
+                print_progress(f"   ⚠️ Error during scrolling: tab crashed or unresponsive")
 
             # Enhanced product container detection - start with the most reliable selector
             product_elements = []
@@ -621,14 +655,18 @@ def scrape_category(driver, url):
             
             for product in product_elements:
                 try:
-                    # Enhanced product name - handle truncated names with multiple selectors
+                    # Enhanced product name extraction - try multiple approaches
                     name = ""
+                    
+                    # Strategy 1: Try the most common selectors first
                     name_selectors = [
-                        ".pt__link", 
-                        ".pt__link a", 
-                        ".ln-c-card__title a",
-                        ".pt-grid-item .pt__link",
-                        "h3 a"
+                        ".pt__link",
+                        "a.pt__link", 
+                        ".pt__info .pt__link",
+                        ".pt__content .pt__link",
+                        "h3.pt__name a",
+                        ".pt__name a",
+                        "a[data-testid*='product-name']"
                     ]
                     
                     for name_selector in name_selectors:
@@ -637,35 +675,59 @@ def scrape_category(driver, url):
                             name = name_elem.text.strip()
                             
                             # Handle truncated names with full title
-                            full_title = name_elem.get_attribute('title')
-                            if name.endswith('...') and full_title and len(full_title) > len(name):
-                                name = full_title.strip()
-                            elif not name and full_title:
-                                name = full_title.strip()
+                            if not name:
+                                name = name_elem.get_attribute('title') or ""
+                            elif name.endswith('...'):
+                                full_title = name_elem.get_attribute('title') or ""
+                                if len(full_title) > len(name):
+                                    name = full_title
                             
                             if name:
                                 break
                         except:
                             continue
                     
+                    # Strategy 2: If no name found, try broader selectors
+                    if not name:
+                        broader_selectors = [
+                            "a[href*='/gol-ui/groceries/']",
+                            ".pt__content a",
+                            "a[title]"
+                        ]
+                        
+                        for selector in broader_selectors:
+                            try:
+                                name_elem = product.find_element(By.CSS_SELECTOR, selector)
+                                name = name_elem.text.strip() or name_elem.get_attribute('title') or ""
+                                if name and len(name) > 3:  # Basic validation
+                                    break
+                            except:
+                                continue
+                    
                     if not name:
                         continue
                     
-                    # Enhanced price extraction - include pence prices with multiple selectors
+                    # Enhanced price extraction with more selectors
                     price = "N/A"
+                    
+                    # Strategy 1: Try specific price selectors
                     price_selectors = [
                         '[data-testid="pt-retail-price"]',
+                        '.pt__cost .pt__cost__retail-price',
                         '.pt__cost__retail-price',
-                        '*[class*="retail-price"]',
+                        '.pt__cost .ln-c-price',
+                        '.ln-c-price',
                         '.pt__cost span:first-child',
-                        '.ln-c-card__price',
-                        '.pt__cost'
+                        '.pt__cost',
+                        '*[class*="retail-price"]',
+                        '*[class*="price"]'
                     ]
                     
                     for price_selector in price_selectors:
                         try:
                             price_elem = product.find_element(By.CSS_SELECTOR, price_selector)
                             price_text = price_elem.text.strip()
+                            
                             # Enhanced regex to catch £X.XX, £X, and Xp formats
                             price_match = re.search(r'£[\d.,]+|\d+p', price_text)
                             if price_match:
@@ -673,25 +735,40 @@ def scrape_category(driver, url):
                                 break
                         except:
                             continue
+                    
+                    # Strategy 2: If no price found, look for any element with price-like text
+                    if price == "N/A":
+                        try:
+                            all_text = product.text
+                            price_match = re.search(r'£[\d.,]+|\d+p', all_text)
+                            if price_match:
+                                price = price_match.group()
+                        except:
+                            pass
 
-                    # Nectar price - handle cases where it doesn't exist
+                    # Nectar price - simplified approach
                     nectar_price = "N/A"
                     try:
-                        # Check if there's a contextual price wrapper first
-                        contextual_wrapper = product.find_element(By.CSS_SELECTOR, '[data-testid="whole-contextual-price"]')
-                        if contextual_wrapper:
+                        nectar_selectors = [
+                            '[data-testid="contextual-price-text"]',
+                            '*[class*="contextual-price"]',
+                            '*[class*="nectar"]'
+                        ]
+                        
+                        for nectar_selector in nectar_selectors:
                             try:
-                                nectar_elem = product.find_element(By.CSS_SELECTOR, '[data-testid="contextual-price-text"]')
+                                nectar_elem = product.find_element(By.CSS_SELECTOR, nectar_selector)
                                 nectar_text = nectar_elem.text.strip()
                                 nectar_match = re.search(r'£[\d.,]+|\d+p', nectar_text)
                                 if nectar_match:
                                     nectar_price = nectar_match.group()
+                                    break
                             except:
-                                pass
+                                continue
                     except:
-                        # No contextual price wrapper means no Nectar price available
                         pass
 
+                    # Add product if we have both name and price
                     if name and price != "N/A":
                         product_data = {
                             "Category": category_name,
@@ -700,21 +777,23 @@ def scrape_category(driver, url):
                             "Price with Nectar": nectar_price
                         }
                         page_products.append(product_data)
+                    else:
+                        # Debug why product wasn't added
+                        if not name:
+                            print_progress(f"   🔍 DEBUG: No name found for product")
+                        if price == "N/A":
+                            print_progress(f"   🔍 DEBUG: No price found for product: {name[:30] if name else 'Unknown'}")
                         
-                except Exception:
+                except Exception as e:
+                    print_progress(f"   🔍 DEBUG: Exception processing product: {str(e)[:50]}")
                     continue
 
             print_progress(f"   ✅ Found {len(page_products)} products on page {page}")
 
             # Debug for categories with 0 products when elements exist
             if len(page_products) == 0 and len(product_elements) > 0:
-                try:
-                    first_elem = product_elements[0]
-                    elem_html = first_elem.get_attribute('outerHTML')[:200]
-                    print_progress(f"   🔍 DEBUG: Found {len(product_elements)} elements but 0 products")
-                    print_progress(f"   🔍 First element HTML: {elem_html}")
-                except:
-                    pass
+                print_progress(f"   🔍 DEBUG: Found {len(product_elements)} elements but 0 products")
+                debug_product_structure(product_elements, category_name)
 
             # Check for end conditions
             if check_pagination_and_duplicates(driver, page_products, all_seen_product_names):
@@ -815,17 +894,10 @@ def save_products(products):
     except:
         pass
 
-def print_progress(message, flush=True):
-    """Print with immediate flush for GitHub Actions visibility"""
-    print(message)
-    if flush:
-        import sys
-        sys.stdout.flush()
-
 def main():
     env = "GitHub Actions" if detect_environment() else "Local"
-    print(f"🛒 Starting Sainsbury's scraper ({env})")
-    print(f"📋 Categories: {len(CATEGORY_URLS)} | Processing: Sequential")
+    print_progress(f"🛒 Starting Sainsbury's scraper ({env})")
+    print_progress(f"📋 Categories: {len(CATEGORY_URLS)} | Processing: Sequential")
 
     start_time = time.time()
     products = scrape_all_categories()
@@ -833,9 +905,9 @@ def main():
 
     save_products(products)
 
-    print(f"\n🎉 COMPLETED!")
-    print(f"📊 Total products: {len(products)}")
-    print(f"⏱️ Time: {elapsed:.0f}s | Speed: {len(products)/elapsed:.1f} products/sec")
+    print_progress(f"\n🎉 COMPLETED!")
+    print_progress(f"📊 Total products: {len(products)}")
+    print_progress(f"⏱️ Time: {elapsed:.0f}s | Speed: {len(products)/elapsed:.1f} products/sec")
 
 if __name__ == "__main__":
     main()
