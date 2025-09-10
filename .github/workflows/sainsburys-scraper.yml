@@ -11,7 +11,7 @@ permissions:
 jobs:
   scrape-sainsburys:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 150
     
     steps:
     - name: Checkout repository
