@@ -555,11 +555,9 @@ def check_pagination_and_duplicates(driver, current_page_products, all_seen_prod
     return False
 
 def scrape_category(driver, url):
-    """Scrape all pages from a category"""
+    """Scrape all pages from a category until next button is disabled"""
     products = []
     page = 1
-    all_seen_product_names = set()
-    consecutive_duplicate_pages = 0
     max_pages = 50
 
     # Extract category name
@@ -585,9 +583,9 @@ def scrape_category(driver, url):
                 paged_url = f"{url}/opt/page:{page}"
             
             print_progress(f"   📄 Scraping page {page}...")
+            driver.get(paged_url)
             print_progress(f"   🔍 Page title: {driver.title}")
             print_progress(f"   🔍 Current URL: {driver.current_url}")
-            driver.get(paged_url)
 
             if page == 1:
                 cookies_handled = handle_cookies_once(driver)
@@ -605,22 +603,21 @@ def scrape_category(driver, url):
             except:
                 pass
 
-            # Scroll to load all products before scraping (with crash protection)
+            # Scroll to load all products before scraping
             scroll_success = scroll_to_load_all_products(driver)
             if scroll_success:
-                print_progress(f"   📜 Scrolled {3} times to load all products")
+                print_progress(f"   📜 Scrolled to load all products")
             else:
-                print_progress(f"   ⚠️ Error during scrolling: tab crashed or unresponsive")
+                print_progress(f"   ⚠️ Error during scrolling")
 
-            # Enhanced product container detection - start with the most reliable selector
+            # Find product elements
             product_elements = []
             
-            # Start with the most reliable selector
             try:
                 elements = driver.find_elements(By.CSS_SELECTOR, ".pt__content")
                 if elements:
                     product_elements = elements
-                    print_progress(f"   ✅ Found {len(elements)} products using selector: .pt__content")
+                    print_progress(f"   ✅ Found {len(elements)} product elements using selector: .pt__content")
             except:
                 pass
             
@@ -641,7 +638,7 @@ def scrape_category(driver, url):
                         elements = driver.find_elements(By.CSS_SELECTOR, selector)
                         if elements:
                             product_elements = elements
-                            print_progress(f"   ✅ Found {len(elements)} products using selector: {selector}")
+                            print_progress(f"   ✅ Found {len(elements)} product elements using selector: {selector}")
                             break
                     except:
                         continue
@@ -650,15 +647,13 @@ def scrape_category(driver, url):
                 print_progress(f"   ⚠️ No product elements found on page {page}")
                 break
 
-            # Initialize page_products list before extracting products
+            # Extract products from this page
             page_products = []
             
-            for product in product_elements:
+            for i, product in enumerate(product_elements):
                 try:
-                    # Enhanced product name extraction - try multiple approaches
+                    # Extract product name
                     name = ""
-                    
-                    # Strategy 1: Try the most common selectors first
                     name_selectors = [
                         ".pt__link",
                         "a.pt__link", 
@@ -666,7 +661,10 @@ def scrape_category(driver, url):
                         ".pt__content .pt__link",
                         "h3.pt__name a",
                         ".pt__name a",
-                        "a[data-testid*='product-name']"
+                        "a[data-testid*='product-name']",
+                        "a[href*='/gol-ui/groceries/']",
+                        ".pt__content a",
+                        "a[title]"
                     ]
                     
                     for name_selector in name_selectors:
@@ -682,35 +680,16 @@ def scrape_category(driver, url):
                                 if len(full_title) > len(name):
                                     name = full_title
                             
-                            if name:
+                            if name and len(name) > 3:
                                 break
                         except:
                             continue
                     
-                    # Strategy 2: If no name found, try broader selectors
-                    if not name:
-                        broader_selectors = [
-                            "a[href*='/gol-ui/groceries/']",
-                            ".pt__content a",
-                            "a[title]"
-                        ]
-                        
-                        for selector in broader_selectors:
-                            try:
-                                name_elem = product.find_element(By.CSS_SELECTOR, selector)
-                                name = name_elem.text.strip() or name_elem.get_attribute('title') or ""
-                                if name and len(name) > 3:  # Basic validation
-                                    break
-                            except:
-                                continue
-                    
                     if not name:
                         continue
                     
-                    # Enhanced price extraction with more selectors
+                    # Extract price
                     price = "N/A"
-                    
-                    # Strategy 1: Try specific price selectors
                     price_selectors = [
                         '[data-testid="pt-retail-price"]',
                         '.pt__cost .pt__cost__retail-price',
@@ -736,7 +715,7 @@ def scrape_category(driver, url):
                         except:
                             continue
                     
-                    # Strategy 2: If no price found, look for any element with price-like text
+                    # If no price found, look for any element with price-like text
                     if price == "N/A":
                         try:
                             all_text = product.text
@@ -746,7 +725,7 @@ def scrape_category(driver, url):
                         except:
                             pass
 
-                    # Nectar price - simplified approach
+                    # Extract Nectar price
                     nectar_price = "N/A"
                     try:
                         nectar_selectors = [
@@ -777,60 +756,59 @@ def scrape_category(driver, url):
                             "Price with Nectar": nectar_price
                         }
                         page_products.append(product_data)
-                    else:
-                        # Debug why product wasn't added
-                        if not name:
-                            print_progress(f"   🔍 DEBUG: No name found for product")
-                        if price == "N/A":
-                            print_progress(f"   🔍 DEBUG: No price found for product: {name[:30] if name else 'Unknown'}")
                         
                 except Exception as e:
-                    print_progress(f"   🔍 DEBUG: Exception processing product: {str(e)[:50]}")
                     continue
 
-            print_progress(f"   ✅ Found {len(page_products)} products on page {page}")
+            print_progress(f"   ✅ Extracted {len(page_products)} valid products from {len(product_elements)} elements")
+
+            # Add ALL products from this page (no duplicate checking)
+            products.extend(page_products)
+            print_progress(f"   ➕ Added {len(page_products)} products to total")
+            print_progress(f"   📊 Running total: {len(products)} products")
 
             # Debug for categories with 0 products when elements exist
             if len(page_products) == 0 and len(product_elements) > 0:
-                print_progress(f"   🔍 DEBUG: Found {len(product_elements)} elements but 0 products")
+                print_progress(f"   🔍 DEBUG: Found {len(product_elements)} elements but 0 valid products")
                 debug_product_structure(product_elements, category_name)
 
-            # Check for end conditions
-            if check_pagination_and_duplicates(driver, page_products, all_seen_product_names):
-                print_progress(f"   🔚 Reached end of pagination or found duplicates")
+            # Check if next button is disabled (ONLY way to stop)
+            next_button_disabled = True
+            try:
+                # Look for enabled next buttons
+                enabled_next_selectors = [
+                    'button[rel="next"]:not(.is-disabled):not([disabled]):not([aria-disabled="true"])',
+                    '.ln-c-pagination__link[rel="next"]:not(.is-disabled):not([disabled]):not([aria-disabled="true"])',
+                    'a[rel="next"]:not(.is-disabled)',
+                    '.pagination-next:not(.disabled)'
+                ]
+                
+                for selector in enabled_next_selectors:
+                    try:
+                        next_button = driver.find_element(By.CSS_SELECTOR, selector)
+                        if next_button and next_button.is_enabled() and next_button.is_displayed():
+                            next_button_disabled = False
+                            print_progress(f"   ▶️ Next button found and enabled")
+                            break
+                    except:
+                        continue
+                
+                if next_button_disabled:
+                    print_progress(f"   🔚 Next button is disabled - reached end of category")
+                    break
+                        
+            except Exception:
+                print_progress(f"   ⚠️ Error checking pagination - assuming end reached")
                 break
 
-            # Add new products only
-            new_products = []
-            for product in page_products:
-                if product["Product Name"] not in all_seen_product_names:
-                    new_products.append(product)
-                    all_seen_product_names.add(product["Product Name"])
-
-            products.extend(new_products)
-            
-            if len(new_products) > 0:
-                print_progress(f"   ➕ Added {len(new_products)} new products")
-            
-            # Track consecutive pages with no new products - be less aggressive
-            if len(new_products) == 0:
-                consecutive_duplicate_pages += 1
-                print_progress(f"   ⚠️ No new products on page {page} (consecutive: {consecutive_duplicate_pages})")
-                if consecutive_duplicate_pages >= 3:  # Reduced from 5 to 3 for speed
-                    print_progress(f"   🔚 Stopping after {consecutive_duplicate_pages} consecutive pages with no new products")
-                    break
-            else:
-                consecutive_duplicate_pages = 0
-
             page += 1
-            # Shorter delays for GitHub Actions
-            time.sleep(random.uniform(0.3, 0.7))  # Reduced from 0.5-1.0
+            time.sleep(random.uniform(0.3, 0.7))
 
         except Exception as e:
             print_progress(f"   ❌ Error on page {page}: {e}")
             break
 
-    print_progress(f"✅ Category {category_name} completed: {len(products)} total unique products")
+    print_progress(f"✅ Category {category_name} completed: {len(products)} total products")
     return products
 
 def scrape_single_category(url):
