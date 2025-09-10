@@ -97,12 +97,12 @@ jobs:
     - name: Create public directory
       run: mkdir -p app/public
     
-    - name: Run Sainsbury's scraper (unchanged)
-      timeout-minutes: 115
+    - name: Run Sainsbury's scraper with progress
+      timeout-minutes: 140  # Increased from 115 to 140 minutes
       run: |
         cd WebScrape
         echo "🛒 Starting Sainsbury's scraper..."
-        echo "📋 Mode: Using original sainsburys.py (no modifications)"
+        echo "📋 Mode: Enhanced with real-time progress"
         echo "🔧 Sequential processing (MAX_THREADS = 1)"
         echo "📄 All categories included"
         echo "🕐 Started: $(date)"
@@ -114,9 +114,9 @@ jobs:
         Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
         sleep 5
         
-        # Run the original sainsburys.py script without modifications
-        echo "Executing: python sainsburys.py"
-        timeout 6900 python sainsburys.py 2>&1 | tee sainsburys.log
+        # Run with unbuffered output for real-time progress
+        echo "Executing: python -u sainsburys.py"
+        timeout 8400 python -u sainsburys.py 2>&1 | tee sainsburys.log
         
         echo "Sainsbury's scraper completed at: $(date)"
     

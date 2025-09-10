@@ -543,6 +543,8 @@ def scrape_category(driver, url):
         except:
             category_name = "unknown"
 
+    print_progress(f"🛒 Starting category: {category_name}")
+
     while page <= max_pages:
         try:
             if page == 1:
@@ -550,10 +552,13 @@ def scrape_category(driver, url):
             else:
                 paged_url = f"{url}/opt/page:{page}"
             
+            print_progress(f"   📄 Scraping page {page}...")
             driver.get(paged_url)
 
             if page == 1:
-                handle_cookies_once(driver)
+                cookies_handled = handle_cookies_once(driver)
+                if cookies_handled:
+                    print_progress(f"   🍪 Accepted cookies")
 
             time.sleep(random.uniform(0.5, 1.0))
 
@@ -561,14 +566,17 @@ def scrape_category(driver, url):
             try:
                 body_text = driver.find_element(By.TAG_NAME, "body").text
                 if "blocked" in body_text.lower() or "captcha" in body_text.lower():
+                    print_progress(f"   🚫 Page appears to be blocked or showing CAPTCHA")
                     break
             except:
                 pass
 
             # Scroll to load all products before scraping (with crash protection)
             scroll_success = scroll_to_load_all_products(driver)
-            if not scroll_success:
-                pass  # Continue without scroll
+            if scroll_success:
+                print_progress(f"   📜 Scrolled to load all products")
+            else:
+                print_progress(f"   ⚠️ Scrolling failed, continuing without scroll")
 
             # Enhanced product container detection - start with the most reliable selector
             product_elements = []
@@ -578,6 +586,7 @@ def scrape_category(driver, url):
                 elements = driver.find_elements(By.CSS_SELECTOR, ".pt__content")
                 if elements:
                     product_elements = elements
+                    print_progress(f"   ✅ Found {len(elements)} products using selector: .pt__content")
             except:
                 pass
             
@@ -598,11 +607,13 @@ def scrape_category(driver, url):
                         elements = driver.find_elements(By.CSS_SELECTOR, selector)
                         if elements:
                             product_elements = elements
+                            print_progress(f"   ✅ Found {len(elements)} products using selector: {selector}")
                             break
                     except:
                         continue
 
             if not product_elements:
+                print_progress(f"   ⚠️ No product elements found on page {page}")
                 break
 
             # Initialize page_products list before extracting products
@@ -693,18 +704,21 @@ def scrape_category(driver, url):
                 except Exception:
                     continue
 
+            print_progress(f"   ✅ Found {len(page_products)} products on page {page}")
+
             # Debug for categories with 0 products when elements exist
             if len(page_products) == 0 and len(product_elements) > 0:
                 try:
                     first_elem = product_elements[0]
                     elem_html = first_elem.get_attribute('outerHTML')[:200]
-                    print(f"   🔍 DEBUG: Found {len(product_elements)} elements but 0 products")
-                    print(f"   🔍 First element HTML: {elem_html}")
+                    print_progress(f"   🔍 DEBUG: Found {len(product_elements)} elements but 0 products")
+                    print_progress(f"   🔍 First element HTML: {elem_html}")
                 except:
                     pass
 
             # Check for end conditions
             if check_pagination_and_duplicates(driver, page_products, all_seen_product_names):
+                print_progress(f"   🔚 Reached end of pagination or found duplicates")
                 break
 
             # Add new products only
@@ -716,22 +730,28 @@ def scrape_category(driver, url):
 
             products.extend(new_products)
             
+            if len(new_products) > 0:
+                print_progress(f"   ➕ Added {len(new_products)} new products")
+            
             # Track consecutive pages with no new products - be less aggressive
             if len(new_products) == 0:
                 consecutive_duplicate_pages += 1
-                if consecutive_duplicate_pages >= 5:  # Increased back to 5
+                print_progress(f"   ⚠️ No new products on page {page} (consecutive: {consecutive_duplicate_pages})")
+                if consecutive_duplicate_pages >= 3:  # Reduced from 5 to 3 for speed
+                    print_progress(f"   🔚 Stopping after {consecutive_duplicate_pages} consecutive pages with no new products")
                     break
             else:
                 consecutive_duplicate_pages = 0
 
             page += 1
             # Shorter delays for GitHub Actions
-            time.sleep(random.uniform(0.5, 1.0))
+            time.sleep(random.uniform(0.3, 0.7))  # Reduced from 0.5-1.0
 
-        except Exception:
+        except Exception as e:
+            print_progress(f"   ❌ Error on page {page}: {e}")
             break
 
-    print(f"✅ {category_name}: {len(products)} products")
+    print_progress(f"✅ Category {category_name} completed: {len(products)} total unique products")
     return products
 
 def scrape_single_category(url):
@@ -755,17 +775,20 @@ def scrape_single_category(url):
 def scrape_all_categories():
     """Scrape all categories sequentially"""
     all_products = []
+    total_categories = len(CATEGORY_URLS)
     
     for i, url in enumerate(CATEGORY_URLS, 1):
         try:
+            print_progress(f"📊 Progress: Starting {i}/{total_categories} categories")
             products = scrape_single_category(url)
             all_products.extend(products)
-        except Exception:
-            pass
+            print_progress(f"📊 Progress: {i}/{total_categories} categories completed")
+        except Exception as e:
+            print_progress(f"❌ Error scraping category {url}: {e}")
         
         # Shorter delays for GitHub Actions
         if i < len(CATEGORY_URLS):
-            time.sleep(0.5)
+            time.sleep(0.3)  # Reduced from 0.5
 
     return all_products
 
@@ -791,6 +814,13 @@ def save_products(products):
             writer.writerows(products)
     except:
         pass
+
+def print_progress(message, flush=True):
+    """Print with immediate flush for GitHub Actions visibility"""
+    print(message)
+    if flush:
+        import sys
+        sys.stdout.flush()
 
 def main():
     env = "GitHub Actions" if detect_environment() else "Local"
