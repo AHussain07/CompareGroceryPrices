@@ -570,41 +570,36 @@ def scrape_category(driver, url):
             if not scroll_success:
                 pass  # Continue without scroll
 
-            # Enhanced product container detection with multiple attempts
+            # Enhanced product container detection - start with the most reliable selector
             product_elements = []
             
-            # Try multiple selector approaches
-            selector_attempts = [
-                ".pt__content",
-                ".pt-grid-item", 
-                "article.pt",
-                ".ln-c-card.pt",
-                "*[class*='pt__content']",
-                ".pt__content--with-header"
-            ]
+            # Start with the most reliable selector
+            try:
+                elements = driver.find_elements(By.CSS_SELECTOR, ".pt__content")
+                if elements:
+                    product_elements = elements
+            except:
+                pass
             
-            for selector in selector_attempts:
-                try:
-                    # Wait for elements to be present
-                    WebDriverWait(driver, 5).until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, selector))
-                    )
-                    elements = driver.find_elements(By.CSS_SELECTOR, selector)
-                    if elements:
-                        product_elements = elements
-                        break
-                except Exception:
-                    continue
-            
-            # If still no products, try without WebDriverWait
+            # If main selector fails, try alternatives
             if not product_elements:
-                for selector in selector_attempts:
+                alternative_selectors = [
+                    ".pt-grid-item", 
+                    "article.pt",
+                    ".ln-c-card.pt",
+                    "*[class*='pt__content']",
+                    ".pt__content--with-header",
+                    ".ln-o-grid__column .pt",
+                    "[data-testid*='product']"
+                ]
+                
+                for selector in alternative_selectors:
                     try:
                         elements = driver.find_elements(By.CSS_SELECTOR, selector)
                         if elements:
                             product_elements = elements
                             break
-                    except Exception:
+                    except:
                         continue
 
             if not product_elements:
@@ -615,32 +610,58 @@ def scrape_category(driver, url):
             
             for product in product_elements:
                 try:
-                    # Enhanced product name - handle truncated names
-                    try:
-                        name_elem = product.find_element(By.CSS_SELECTOR, ".pt__link")
-                        name = name_elem.text.strip()
-                        
-                        # Handle truncated names with full title
-                        full_title = name_elem.get_attribute('title')
-                        if name.endswith('...') and full_title and len(full_title) > len(name):
-                            name = full_title.strip()
-                        elif not name and full_title:
-                            name = full_title.strip()
-                    except:
-                        continue
+                    # Enhanced product name - handle truncated names with multiple selectors
+                    name = ""
+                    name_selectors = [
+                        ".pt__link", 
+                        ".pt__link a", 
+                        ".ln-c-card__title a",
+                        ".pt-grid-item .pt__link",
+                        "h3 a"
+                    ]
+                    
+                    for name_selector in name_selectors:
+                        try:
+                            name_elem = product.find_element(By.CSS_SELECTOR, name_selector)
+                            name = name_elem.text.strip()
+                            
+                            # Handle truncated names with full title
+                            full_title = name_elem.get_attribute('title')
+                            if name.endswith('...') and full_title and len(full_title) > len(name):
+                                name = full_title.strip()
+                            elif not name and full_title:
+                                name = full_title.strip()
+                            
+                            if name:
+                                break
+                        except:
+                            continue
                     
                     if not name:
                         continue
                     
-                    # Enhanced price extraction - include pence prices
-                    try:
-                        price_elem = product.find_element(By.CSS_SELECTOR, '[data-testid="pt-retail-price"]')
-                        price_text = price_elem.text.strip()
-                        # Enhanced regex to catch £X.XX, £X, and Xp formats
-                        price_match = re.search(r'£[\d.,]+|\d+p', price_text)
-                        price = price_match.group() if price_match else "N/A"
-                    except:
-                        price = "N/A"
+                    # Enhanced price extraction - include pence prices with multiple selectors
+                    price = "N/A"
+                    price_selectors = [
+                        '[data-testid="pt-retail-price"]',
+                        '.pt__cost__retail-price',
+                        '*[class*="retail-price"]',
+                        '.pt__cost span:first-child',
+                        '.ln-c-card__price',
+                        '.pt__cost'
+                    ]
+                    
+                    for price_selector in price_selectors:
+                        try:
+                            price_elem = product.find_element(By.CSS_SELECTOR, price_selector)
+                            price_text = price_elem.text.strip()
+                            # Enhanced regex to catch £X.XX, £X, and Xp formats
+                            price_match = re.search(r'£[\d.,]+|\d+p', price_text)
+                            if price_match:
+                                price = price_match.group()
+                                break
+                        except:
+                            continue
 
                     # Nectar price - handle cases where it doesn't exist
                     nectar_price = "N/A"
@@ -672,6 +693,16 @@ def scrape_category(driver, url):
                 except Exception:
                     continue
 
+            # Debug for categories with 0 products when elements exist
+            if len(page_products) == 0 and len(product_elements) > 0:
+                try:
+                    first_elem = product_elements[0]
+                    elem_html = first_elem.get_attribute('outerHTML')[:200]
+                    print(f"   🔍 DEBUG: Found {len(product_elements)} elements but 0 products")
+                    print(f"   🔍 First element HTML: {elem_html}")
+                except:
+                    pass
+
             # Check for end conditions
             if check_pagination_and_duplicates(driver, page_products, all_seen_product_names):
                 break
@@ -685,10 +716,10 @@ def scrape_category(driver, url):
 
             products.extend(new_products)
             
-            # Track consecutive pages with no new products
+            # Track consecutive pages with no new products - be less aggressive
             if len(new_products) == 0:
                 consecutive_duplicate_pages += 1
-                if consecutive_duplicate_pages >= 3:  # Reduced from 5 to 3 for efficiency
+                if consecutive_duplicate_pages >= 5:  # Increased back to 5
                     break
             else:
                 consecutive_duplicate_pages = 0
