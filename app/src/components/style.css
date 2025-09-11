@@ -2490,11 +2490,6 @@ body {
     line-height: 1.2;
   }
 
-  /* ADD THIS HERE - Hide missing product description on mobile */
-  .missing-product-description {
-    display: none;
-  }
-
   .hero-description {
     font-size: var(--text-base);
     margin-bottom: var(--space-8);
@@ -2647,7 +2642,7 @@ body {
     margin-bottom: var(--space-4);
   }
 
-  /* Missing Product Section - Blue theme on mobile */
+  /* Missing Product Section */
   .missing-product-section {
     margin: 0 var(--space-2) var(--space-6);
     padding: var(--space-5);
@@ -2668,9 +2663,9 @@ body {
     margin-bottom: var(--space-2);
   }
 
+  /* Hide description on mobile and small devices */
   .missing-product-description {
-    font-size: var(--text-sm);
-    margin-bottom: var(--space-4);
+    display: none;
   }
 
   .report-missing-link {
@@ -2679,39 +2674,66 @@ body {
     background: var(--color-primary);
   }
 
-  /* Hide description on mobile and small devices */
-  @media (max-width: 768px) {
-    .missing-product-description {
-      display: none;
-    }
-  }
-
-  @media (max-width: 1024px) {
-    .missing-product-description {
-      display: none;
-    }
-  }
-
-  /* Button Layout Management */
+  /* Action Buttons - Ensure consistent height */
   .action-buttons {
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
     gap: var(--space-3);
     justify-content: center;
-    align-items: center;
+    align-items: stretch; /* Ensure equal height */
     margin: 0 var(--space-4);
   }
 
   .back-button,
   .continue-button,
-  .submit-button {
-    width: auto;
-    max-width: none;
+  .submit-button,
+  .compare-button {
     flex: 1;
     padding: var(--space-3) var(--space-6);
     font-size: var(--text-sm);
     min-width: 120px;
+    max-width: none;
+    height: 48px; /* Force consistent height */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    box-sizing: border-box; /* Include padding in height calculation */
+    line-height: 1.2; /* Consistent line height */
+  }
+
+  /* Ensure all button types have same base styling */
+  .back-button {
+    background: var(--color-secondary);
+    color: var(--color-gray-700);
+    border: none;
+    border-radius: var(--radius-lg);
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    text-decoration: none;
+  }
+
+  .continue-button,
+  .submit-button,
+  .compare-button {
+    background: var(--color-primary);
+    color: var(--color-white);
+    border: none;
+    border-radius: var(--radius-lg);
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    text-decoration: none;
+    margin-bottom: 0; /* Remove any inherited margin */
+  }
+
+  /* Shopping list and results specific overrides */
+  .shopping-content .action-buttons,
+  .results-section .action-buttons {
+    margin-top: var(--space-6);
+    align-items: stretch; /* Ensure equal height */
   }
 
   /* Results Page */
@@ -2771,13 +2793,12 @@ body {
     padding: var(--space-4);
   }
 
-  /* Store comparison on same line for mobile */
+  /* Store comparison - keep horizontal layout like desktop */
   .store-comparison {
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: var(--space-3);
     align-items: center;
-    gap: var(--space-2);
     margin-bottom: var(--space-3);
     padding: var(--space-3);
     background: var(--color-gray-50);
@@ -2785,13 +2806,11 @@ body {
   }
 
   .store-item {
-    flex: 1;
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
     text-align: center;
     align-items: center;
-    padding: var(--space-2);
   }
 
   .store-name {
@@ -2812,25 +2831,22 @@ body {
     padding: var(--space-1) var(--space-3);
     margin-top: var(--space-1);
     text-align: center;
-    margin-left: auto;
-    margin-right: auto;
     display: block;
     width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
   }
 
   .vs-divider {
     font-size: var(--text-xs);
     background: var(--color-white);
-    padding: var(--space-1);
     border-radius: 50%;
     width: var(--space-6);
     height: var(--space-6);
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
     border: 1px solid var(--color-border);
-    margin: 0;
   }
 
   .saving-highlight {
@@ -2842,17 +2858,6 @@ body {
 
   .insights-container {
     padding: var(--space-4);
-  }
-
-  .results-actions {
-    flex-direction: column;
-    gap: var(--space-3);
-    margin: 0 var(--space-2);
-  }
-
-  .action-btn {
-    width: 100%;
-    max-width: none;
   }
 }
 
@@ -2881,17 +2886,22 @@ body {
     padding: 0 var(--space-2);
   }
 
+  /* Action buttons - maintain consistent height */
   .action-buttons {
     gap: var(--space-2);
     margin: 0 var(--space-2);
+    align-items: stretch; /* Ensure equal height */
   }
 
   .back-button,
   .continue-button,
-  .submit-button {
+  .submit-button,
+  .compare-button {
     padding: var(--space-3) var(--space-4);
     font-size: var(--text-sm);
     min-width: 100px;
+    height: 44px; /* Smaller but consistent height */
+    line-height: 1.2;
   }
 
   .select-title,
@@ -2925,15 +2935,15 @@ body {
     padding: var(--space-4);
   }
 
+  /* Store comparison - smaller spacing but same layout */
   .store-comparison {
-    gap: var(--space-1);
+    gap: var(--space-2);
     padding: var(--space-2);
     margin-bottom: var(--space-2);
   }
 
   .store-item {
     gap: var(--space-1);
-    padding: var(--space-1);
   }
 
   .price {
@@ -2972,17 +2982,22 @@ body {
     font-size: var(--text-lg);
   }
 
+  /* Action buttons - maintain consistent height */
   .action-buttons {
     gap: var(--space-1);
     margin: 0;
+    align-items: stretch; /* Ensure equal height */
   }
 
   .back-button,
   .continue-button,
-  .submit-button {
+  .submit-button,
+  .compare-button {
     padding: var(--space-2);
     font-size: var(--text-xs);
     min-width: 70px;
+    height: 40px; /* Even smaller but consistent height */
+    line-height: 1.2;
   }
 
   .button-icon {
@@ -2998,20 +3013,16 @@ body {
     max-width: 240px;
   }
 
+  /* Store comparison - very compact but still horizontal */
   .store-comparison {
-    flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--space-1);
     padding: var(--space-2);
   }
 
-  .store-item {
-    width: 100%;
-    text-align: center;
-  }
-
   .vs-divider {
-    align-self: center;
-    margin: var(--space-1) 0;
+    width: var(--space-4);
+    height: var(--space-4);
+    font-size: 0.5rem;
   }
 }
 
