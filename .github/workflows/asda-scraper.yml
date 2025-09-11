@@ -3,7 +3,7 @@ name: ASDA Price Scraper
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 12 * * 1'  # Mondays at 12 PM UTC (2 hours after Sainsburys)
+    - cron: '30 4 * * 4'  # Thursdays at 4:30 AM UTC  
 
 permissions:
   contents: write

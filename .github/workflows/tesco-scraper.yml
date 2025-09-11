@@ -3,7 +3,7 @@ name: Tesco Price Scraper
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 14 * * 1'  # Mondays at 2 PM UTC
+    - cron: '30 2 * * 4'  # Thursdays at 2:30 AM UTC
 
 permissions:
   contents: write
