@@ -14,6 +14,9 @@ jobs:
   scrape-aldi:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     
     steps:
     - name: Checkout repository
@@ -47,7 +50,7 @@ jobs:
           sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
         else
           DRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
-          wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com//${DRIVER_VERSION}/chromedriver_linux64.zip"
+          wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${DRIVER_VERSION}/chromedriver_linux64.zip"
           sudo unzip /tmp/chromedriver.zip -d /usr/local/bin/
         fi
         
@@ -213,7 +216,7 @@ jobs:
           echo "- **Store:** ALDI (Final update)" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** Data committed to repository" >> $GITHUB_STEP_SUMMARY
           echo "- **Website:** Rebuilt and deployed with ALL FRESH PRICES! 🎉" >> $GITHUB_STEP_SUMMARY
-          echo "- **Live URL:** https://$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]' | sed 's/.*\///').github.io/$(echo ${{ github.repository }} | sed 's/.*\///')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Live URL:** ${{ steps.deployment.outputs.page_url }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🏪 All Stores Now Updated:" >> $GITHUB_STEP_SUMMARY
           echo "- **Sainsbury's:** Wednesday 12:00 AM UTC" >> $GITHUB_STEP_SUMMARY
