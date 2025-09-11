@@ -5,6 +5,11 @@ on:
   schedule:
     - cron: '0 7 * * 4' #Thursdays at 7:00 AM UTC
 
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
 jobs:
   scrape-aldi:
     runs-on: ubuntu-latest
@@ -101,12 +106,14 @@ jobs:
       run: mkdir -p app/public
     
     - name: Run ALDI scraper with virtual display
+      id: scraping
       run: |
         cd WebScrape
         echo "Starting ALDI scraper..."
         xvfb-run -a -s "-screen 0 1920x1080x24" python aldi.py
     
     - name: Check results and copy CSV
+      id: results
       run: |
         echo "Checking for ALDI CSV files..."
         
@@ -119,28 +126,108 @@ jobs:
         # Check if already in app/public
         if [ -f "app/public/aldi.csv" ]; then
           lines=$(wc -l < app/public/aldi.csv)
-          echo "✅ ALDI CSV created successfully with $lines lines"
+          product_count=$((lines - 1))
+          echo "✅ ALDI CSV created successfully with $lines lines ($product_count products)"
+          echo "success=true" >> $GITHUB_OUTPUT
+          echo "product_count=$product_count" >> $GITHUB_OUTPUT
         else
           echo "❌ ALDI CSV not found in either location"
           echo "Contents of WebScrape directory:"
           ls -la WebScrape/
           echo "Contents of app/public directory:"
           ls -la app/public/
+          echo "success=false" >> $GITHUB_OUTPUT
+          echo "product_count=0" >> $GITHUB_OUTPUT
           exit 1
         fi
     
     - name: Commit and push changes
+      if: steps.results.outputs.success == 'true'
       run: |
         git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+        git config --local user.name "GitHub Action - ALDI Scraper"
         
         # Force add the CSV file (in case .gitignore blocks it)
         git add -f app/public/aldi.csv
         
         if ! git diff --staged --quiet; then
-          git commit -m "Update ALDI prices - $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git commit -m "🛒 ALDI price update - $(date -u '+%Y-%m-%d %H:%M UTC')
+
+          Products: ${{ steps.results.outputs.product_count }}
+          Store: ALDI
+          
+          Auto-updated via GitHub Actions"
           git push
           echo "✅ Changes committed and pushed"
         else
           echo "ℹ️ No changes to commit"
         fi
+    
+    - name: Setup Node.js for website rebuild
+      if: steps.results.outputs.success == 'true'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: app/package-lock.json
+    
+    - name: Install dependencies and build website
+      if: steps.results.outputs.success == 'true'
+      run: |
+        cd app
+        echo "📦 Installing dependencies..."
+        npm ci
+        
+        echo "🔨 Building website with updated prices..."
+        npm run build
+        
+        echo "✅ Website built successfully"
+        ls -la dist/
+    
+    - name: Setup Pages
+      if: steps.results.outputs.success == 'true'
+      uses: actions/configure-pages@v4
+    
+    - name: Upload to GitHub Pages
+      if: steps.results.outputs.success == 'true'
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: app/dist
+    
+    - name: Deploy to GitHub Pages
+      if: steps.results.outputs.success == 'true'
+      id: deployment
+      uses: actions/deploy-pages@v4
+    
+    - name: Summary
+      if: always()
+      run: |
+        echo "## 🛒 ALDI Scraper Summary (Final Update)" >> $GITHUB_STEP_SUMMARY
+        echo "**Run completed:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ steps.results.outputs.success }}" == "true" ]; then
+          echo "### ✅ Success - Final Scraper Run!" >> $GITHUB_STEP_SUMMARY
+          echo "- **Products scraped:** ${{ steps.results.outputs.product_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Store:** ALDI (Final update)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** Data committed to repository" >> $GITHUB_STEP_SUMMARY
+          echo "- **Website:** Rebuilt and deployed with ALL FRESH PRICES! 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "- **Live URL:** https://$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]' | sed 's/.*\///').github.io/$(echo ${{ github.repository }} | sed 's/.*\///')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🏪 All Stores Now Updated:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Sainsbury's:** Wednesday 12:00 AM UTC" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tesco:** Thursday 2:30 AM UTC" >> $GITHUB_STEP_SUMMARY
+          echo "- **ALDI:** Thursday 7:00 AM UTC (FINAL - triggers website rebuild)" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### ❌ Scraping Failed" >> $GITHUB_STEP_SUMMARY
+          echo "- **Error:** Failed to generate ALDI CSV file" >> $GITHUB_STEP_SUMMARY
+          echo "- **Impact:** Website not rebuilt with latest prices" >> $GITHUB_STEP_SUMMARY
+          echo "- **Action:** Check logs and retry if needed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📋 Technical Details" >> $GITHUB_STEP_SUMMARY
+        echo "- **Final scraper run:** ALDI completes the weekly price update cycle" >> $GITHUB_STEP_SUMMARY
+        echo "- **Website rebuild:** Triggered only after ALDI (last scraper)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Fresh data:** All three stores now have current prices" >> $GITHUB_STEP_SUMMARY
+        echo "- **Next update:** Next Wednesday at midnight (Sainsbury's)" >> $GITHUB_STEP_SUMMARY
