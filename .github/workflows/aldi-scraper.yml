@@ -47,7 +47,7 @@ jobs:
           sudo mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
         else
           DRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}")
-          wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${DRIVER_VERSION}/chromedriver_linux64.zip"
+          wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com//${DRIVER_VERSION}/chromedriver_linux64.zip"
           sudo unzip /tmp/chromedriver.zip -d /usr/local/bin/
         fi
         
@@ -182,7 +182,8 @@ jobs:
         npm run build
         
         echo "✅ Website built successfully"
-        ls -la dist/
+        echo "Build directory contents:"
+        ls -la build/
     
     - name: Setup Pages
       if: steps.results.outputs.success == 'true'
@@ -192,7 +193,7 @@ jobs:
       if: steps.results.outputs.success == 'true'
       uses: actions/upload-pages-artifact@v3
       with:
-        path: app/dist
+        path: app/build
     
     - name: Deploy to GitHub Pages
       if: steps.results.outputs.success == 'true'
