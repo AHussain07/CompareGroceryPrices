@@ -1,6 +1,13 @@
 # CompareGroceryPrices 🛒
 
+**🌐 Live Website: [https://www.comparegroceryprices.uk/](https://www.comparegroceryprices.uk/)**
+
 A modern web application that helps users compare grocery prices across major UK supermarkets to find the best deals and save money on their weekly shopping.
+
+![CompareGroceryPrices](https://img.shields.io/badge/Status-Live-brightgreen)
+![Next.js](https://img.shields.io/badge/Next.js-13+-black)
+![React](https://img.shields.io/badge/React-18+-blue)
+![CSS3](https://img.shields.io/badge/CSS3-Responsive-orange)
 
 ## 🌟 Features
 
