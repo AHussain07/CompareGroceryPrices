@@ -19,7 +19,6 @@ A modern web application that helps users compare grocery prices across major UK
 - **Shopping List Builder**: Create and manage your shopping list with ease
 - **Missing Product Reporting**: Report products not found in our database
 
-
 ## 🛠️ Tech Stack
 
 - **Framework**: Next.js 13+
@@ -30,6 +29,17 @@ A modern web application that helps users compare grocery prices across major UK
 - **Routing**: React Router
 - **State Management**: React Hooks (useState, useEffect, useRef)
 
+---
+
+## 🤖 Webscraping & Automation
+
+To ensure up-to-date and accurate supermarket prices, this project uses automated webscraping scripts for each supported supermarket.
+
+- **Scripts Location**: `WebScrape/` directory (e.g., `asda.py`, `tesco.py`, etc.)
+- **Automation**: GitHub Actions workflows in `.github/workflows/` (e.g., `asda-scraper.yml`) schedule and run the scrapers.
+- **Dependencies**: Listed in `WebScrape/requirements.txt`.
+
+
 ## 📋 How It Works
 
 1. **Select Your Preferred Supermarket**: Choose your primary shopping destination
@@ -37,7 +47,6 @@ A modern web application that helps users compare grocery prices across major UK
 3. **Compare Prices**: Our algorithm finds matching products across all supermarkets
 4. **View Results**: See detailed price comparisons and potential savings
 5. **Make Informed Decisions**: Choose where to shop for maximum savings
-
 
 ## 🧮 Key Algorithms
 
@@ -60,8 +69,6 @@ The app calculates potential savings by:
 - Calculating total basket savings
 - Projecting monthly and annual savings potential
 
-
-
 ## 🔮 Future Enhancements
 
 - [ ] User accounts and saved shopping lists
@@ -76,4 +83,3 @@ The app calculates potential savings by:
 ## 🤝 Contributing
 
 We welcome contributions! Please feel free to submit issues, feature requests, or pull requests.
-
