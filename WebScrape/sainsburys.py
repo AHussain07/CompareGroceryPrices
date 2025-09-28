@@ -16,12 +16,27 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # === Patch uc.Chrome destructor to prevent WinError 6 warnings ===
 uc.Chrome.__del__ = lambda self: None
 
-# ========== SCRAPER CONFIG ==========
+# ========== ENHANCED SCRAPER CONFIG ==========
 MAX_THREADS = 1  # Sequential for GitHub Actions stability
 BASE_URL = "https://www.sainsburys.co.uk"
 
 # Global driver management
 WORKING_DRIVER_CONFIG = None
+
+# Enhanced anti-detection configuration
+RANDOM_DELAYS = {
+    'page_load': (2.5, 5.0),      # Longer delays between pages
+    'category_switch': (3.0, 7.0),  # Random delays between categories
+    'scroll_wait': (1.5, 3.0),    # Random scroll delays
+    'initial_load': (5.0, 10.0)   # Initial page load delay
+}
+
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+]
 
 def print_progress(message, flush=True):
     """Print with immediate flush for GitHub Actions visibility"""
@@ -29,6 +44,57 @@ def print_progress(message, flush=True):
     if flush:
         import sys
         sys.stdout.flush()
+
+def detect_blocking_indicators(driver):
+    """Enhanced detection for blocking, CAPTCHAs, or limited content"""
+    try:
+        body_text = driver.find_element(By.TAG_NAME, "body").text.lower()
+        page_source = driver.page_source.lower()
+        current_url = driver.current_url.lower()
+        
+        # Enhanced blocking detection
+        blocking_indicators = [
+            "blocked", "captcha", "unusual traffic", "verify you are human",
+            "security check", "access denied", "temporarily unavailable",
+            "robot", "automated", "suspicious activity", "rate limit",
+            "please wait", "checking your browser", "cloudflare"
+        ]
+        
+        for indicator in blocking_indicators:
+            if indicator in body_text or indicator in page_source:
+                print_progress(f"   🚫 BLOCKING DETECTED: Found '{indicator}' in page content")
+                return True
+        
+        # Check for redirect to blocking page
+        if "blocked" in current_url or "captcha" in current_url:
+            print_progress(f"   🚫 BLOCKING DETECTED: Redirected to blocking URL")
+            return True
+            
+        # Check for minimal product count (strong indicator of soft blocking)
+        try:
+            product_elements = driver.find_elements(By.CSS_SELECTOR, ".pt__content")
+            if len(product_elements) > 0 and len(product_elements) <= 24:  # Typically one page
+                # Check if pagination is missing (another blocking indicator)
+                pagination = driver.find_elements(By.CSS_SELECTOR, '[rel="next"]')
+                if not pagination:
+                    print_progress(f"   ⚠️ SOFT BLOCKING SUSPECTED: Only {len(product_elements)} products and no pagination")
+                    return True
+        except:
+            pass
+        
+        return False
+        
+    except Exception as e:
+        print_progress(f"   ⚠️ Error checking for blocking: {e}")
+        return False
+
+def random_delay(delay_type='page_load'):
+    """Apply random delay based on type"""
+    if delay_type in RANDOM_DELAYS:
+        delay = random.uniform(*RANDOM_DELAYS[delay_type])
+        time.sleep(delay)
+    else:
+        time.sleep(random.uniform(1.0, 3.0))
 
 def debug_product_structure(product_elements, category_name):
     """Debug function to inspect product HTML structure"""
@@ -283,7 +349,7 @@ def cleanup_chromedriver_files():
         pass
 
 def setup_optimized_driver():
-    """Setup Chrome driver optimized for both local and GitHub Actions"""
+    """Setup Chrome driver optimized for both local and GitHub Actions with enhanced anti-detection"""
     global WORKING_DRIVER_CONFIG
     
     # If we have a working config, use it directly
@@ -313,48 +379,6 @@ def setup_optimized_driver():
     is_github = detect_environment()
     chrome_version = get_chrome_version()
     
-    def create_fresh_options():
-        options = uc.ChromeOptions()
-        
-        # Common options
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        options.add_argument("--disable-extensions")
-        options.add_argument("--disable-web-security")
-        options.add_argument("--allow-running-insecure-content")
-        options.add_argument("--disable-features=VizDisplayCompositor")
-        
-        # Disable images and media for faster loading
-        prefs = {
-            "profile.managed_default_content_settings.images": 2,
-            "profile.managed_default_content_settings.media_stream": 2,
-            "profile.default_content_setting_values.notifications": 2,
-            "profile.managed_default_content_settings.geolocation": 2,
-        }
-        options.add_experimental_option("prefs", prefs)
-        
-        # Additional performance options
-        options.add_argument("--disable-plugins")
-        options.add_argument("--disable-background-networking")
-        options.add_argument("--disable-sync")
-        options.add_argument("--disable-translate")
-        options.add_argument("--disable-features=TranslateUI")
-        options.add_argument("--aggressive-cache-discard")
-        options.add_argument("--disable-background-timer-throttling")
-        
-        if is_github:
-            options.add_argument("--headless")
-            options.add_argument("--disable-renderer-backgrounding")
-            options.add_argument("--disable-backgrounding-occluded-windows")
-            options.add_argument("--window-size=1920,1080")
-        else:
-            options.add_argument("--start-maximized")
-        
-        options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36")
-        return options
-
     try:
         # Strategy 1: Try with explicit ChromeDriver path (GitHub Actions)
         if is_github:
@@ -399,11 +423,11 @@ def setup_optimized_driver():
         return None
 
 def create_fresh_options():
-    """Create fresh Chrome options - standalone function for reuse"""
+    """Create fresh Chrome options with enhanced anti-detection"""
     is_github = detect_environment()
     options = uc.ChromeOptions()
     
-    # Common options
+    # Enhanced anti-detection options
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
@@ -413,16 +437,7 @@ def create_fresh_options():
     options.add_argument("--allow-running-insecure-content")
     options.add_argument("--disable-features=VizDisplayCompositor")
     
-    # Disable images and media for faster loading
-    prefs = {
-        "profile.managed_default_content_settings.images": 2,
-        "profile.managed_default_content_settings.media_stream": 2,
-        "profile.default_content_setting_values.notifications": 2,
-        "profile.managed_default_content_settings.geolocation": 2,
-    }
-    options.add_experimental_option("prefs", prefs)
-    
-    # Additional performance options
+    # Additional stealth options
     options.add_argument("--disable-plugins")
     options.add_argument("--disable-background-networking")
     options.add_argument("--disable-sync")
@@ -430,21 +445,44 @@ def create_fresh_options():
     options.add_argument("--disable-features=TranslateUI")
     options.add_argument("--aggressive-cache-discard")
     options.add_argument("--disable-background-timer-throttling")
+    options.add_argument("--disable-renderer-backgrounding")
+    options.add_argument("--disable-backgrounding-occluded-windows")
+    options.add_argument("--disable-client-side-phishing-detection")
+    options.add_argument("--disable-default-apps")
+    options.add_argument("--disable-hang-monitor")
+    options.add_argument("--disable-popup-blocking")
+    options.add_argument("--disable-prompt-on-repost")
+    options.add_argument("--disable-component-extensions-with-background-pages")
+    
+    # Disable images and media for faster loading (but keep some for realism)
+    prefs = {
+        "profile.default_content_setting_values.notifications": 2,
+        "profile.managed_default_content_settings.geolocation": 2,
+        "profile.default_content_settings.popups": 0,
+        # Don't completely disable images - makes us look more like a bot
+        "profile.managed_default_content_settings.media_stream": 2,
+    }
+    options.add_experimental_option("prefs", prefs)
     
     if is_github:
         options.add_argument("--headless")
-        options.add_argument("--disable-renderer-backgrounding")
-        options.add_argument("--disable-backgrounding-occluded-windows")
         options.add_argument("--window-size=1920,1080")
+        options.add_argument("--disable-software-rasterizer")
     else:
         options.add_argument("--start-maximized")
     
-    options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36")
+    # Rotate user agent
+    user_agent = random.choice(USER_AGENTS)
+    options.add_argument(f"--user-agent={user_agent}")
+    
     return options
 
 def handle_cookies_once(driver):
-    """Handle cookies banner if present"""
+    """Handle cookies banner if present with more realistic behavior"""
     try:
+        # Add slight delay before looking for cookie banner
+        random_delay('scroll_wait')
+        
         # Wait for and click cookie accept button
         cookie_selectors = [
             '//button[contains(text(), "Accept") and contains(text(), "Cookies")]',
@@ -456,11 +494,13 @@ def handle_cookies_once(driver):
         
         for selector in cookie_selectors:
             try:
-                cookie_button = WebDriverWait(driver, 3).until(
+                cookie_button = WebDriverWait(driver, 5).until(
                     EC.element_to_be_clickable((By.XPATH, selector))
                 )
+                # Add small delay before clicking
+                time.sleep(random.uniform(0.5, 1.5))
                 cookie_button.click()
-                time.sleep(1)
+                time.sleep(random.uniform(1.0, 2.0))
                 return True
             except:
                 continue
@@ -470,8 +510,8 @@ def handle_cookies_once(driver):
     except Exception:
         return False
 
-def scroll_to_load_all_products(driver, max_scrolls=3):
-    """Scroll down to load all products with lazy loading - safer version"""
+def scroll_to_load_all_products(driver, max_scrolls=5):
+    """Enhanced scroll with more human-like behavior and blocking detection"""
     try:
         # Check if driver is still responsive
         try:
@@ -485,31 +525,56 @@ def scroll_to_load_all_products(driver, max_scrolls=3):
         
         while scrolls < max_scrolls:
             try:
-                # Scroll down more gradually
-                driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
-                time.sleep(1)
+                # More human-like scrolling pattern
+                if scrolls == 0:
+                    # First scroll - check top of page
+                    driver.execute_script("window.scrollTo(0, 300);")
+                    time.sleep(random.uniform(0.8, 1.5))
+                
+                # Scroll down incrementally
+                current_position = driver.execute_script("return window.pageYOffset;")
+                scroll_height = driver.execute_script("return document.body.scrollHeight")
+                
+                # Scroll to 3/4 of page first
+                three_quarter = scroll_height * 0.75
+                driver.execute_script(f"window.scrollTo(0, {three_quarter});")
+                random_delay('scroll_wait')
+                
+                # Then scroll to bottom
                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                 
                 # Wait for new content to load
-                time.sleep(2)
+                random_delay('scroll_wait')
+                
+                # Check for blocking after scrolling
+                if detect_blocking_indicators(driver):
+                    print_progress(f"   🚫 Blocking detected during scroll - stopping")
+                    return False
                 
                 # Calculate new scroll height and compare to last height
                 new_height = driver.execute_script("return document.body.scrollHeight")
                 
                 # If height hasn't changed, we've reached the end
                 if new_height == last_height:
+                    print_progress(f"   📜 No more content to load after {scrolls + 1} scrolls")
                     break
                     
                 last_height = new_height
                 scrolls += 1
                 
+                # Random scroll back up a bit (human behavior)
+                if random.random() < 0.3:  # 30% chance
+                    driver.execute_script("window.scrollTo(0, window.pageYOffset - 200);")
+                    time.sleep(random.uniform(0.3, 0.8))
+                
             except Exception as e:
+                print_progress(f"   ⚠️ Error during scroll {scrolls}: {e}")
                 break
         
         # Scroll back to top for consistent scraping start point
         try:
             driver.execute_script("window.scrollTo(0, 0);")
-            time.sleep(1)
+            random_delay('scroll_wait')
         except:
             pass
         
@@ -518,15 +583,23 @@ def scroll_to_load_all_products(driver, max_scrolls=3):
     except Exception:
         return False
 
-def scrape_category(driver, url):
-    """Scrape all pages from a category until next button is disabled"""
+def scrape_category(driver, url, category_index=0):
+    """Scrape all pages from a category with enhanced anti-detection"""
     products = []
     page = 1
     max_pages = 50
 
     # Extract parent category name from URL
     category_name = extract_parent_category_from_url(url)
-    print_progress(f"🛒 Starting category: {category_name}")
+    print_progress(f"🛒 Starting category {category_index + 1}: {category_name}")
+    
+    # Add random delay before starting category (varies by category index)
+    if category_index > 0:
+        base_delay = random.uniform(3.0, 7.0)
+        # Add more delay for later categories to avoid pattern detection
+        extra_delay = (category_index // 10) * random.uniform(1.0, 3.0)
+        time.sleep(base_delay + extra_delay)
+        print_progress(f"   ⏱️ Applied {base_delay + extra_delay:.1f}s delay before category")
 
     while page <= max_pages:
         try:
@@ -536,32 +609,34 @@ def scrape_category(driver, url):
                 paged_url = f"{url}/opt/page:{page}"
             
             print_progress(f"   📄 Scraping page {page}...")
+            
+            # Add random delay before page load
+            if page > 1:
+                random_delay('page_load')
+            
             driver.get(paged_url)
             print_progress(f"   🔍 Page title: {driver.title}")
             print_progress(f"   🔍 Current URL: {driver.current_url}")
+
+            # Add realistic delay after page load
+            initial_delay = random.uniform(*RANDOM_DELAYS['initial_load']) if page == 1 else random.uniform(2.0, 4.0)
+            time.sleep(initial_delay)
+            
+            # Check for blocking immediately after page load
+            if detect_blocking_indicators(driver):
+                print_progress(f"   🚫 Blocking detected - stopping category scraping")
+                break
 
             if page == 1:
                 cookies_handled = handle_cookies_once(driver)
                 if cookies_handled:
                     print_progress(f"   🍪 Accepted cookies")
 
-            time.sleep(random.uniform(0.5, 1.0))
-
-            # Check for any content at all
-            try:
-                body_text = driver.find_element(By.TAG_NAME, "body").text
-                if "blocked" in body_text.lower() or "captcha" in body_text.lower():
-                    print_progress(f"   🚫 Page appears to be blocked or showing CAPTCHA")
-                    break
-            except:
-                pass
-
             # Scroll to load all products before scraping
             scroll_success = scroll_to_load_all_products(driver)
-            if scroll_success:
-                print_progress(f"   📜 Scrolled to load all products")
-            else:
-                print_progress(f"   ⚠️ Error during scrolling")
+            if not scroll_success:
+                print_progress(f"   ⚠️ Scroll failed or blocking detected")
+                break
 
             # Find product elements
             product_elements = []
@@ -598,13 +673,27 @@ def scrape_category(driver, url):
 
             if not product_elements:
                 print_progress(f"   ⚠️ No product elements found on page {page}")
+                # Check if this might be due to blocking
+                if detect_blocking_indicators(driver):
+                    print_progress(f"   🚫 Confirmed blocking - stopping")
                 break
+
+            # Check for suspiciously low product count (blocking indicator)
+            if len(product_elements) <= 24 and page == 1:  # First page should have more
+                print_progress(f"   ⚠️ Suspiciously low product count: {len(product_elements)}")
+                if detect_blocking_indicators(driver):
+                    print_progress(f"   🚫 Blocking suspected due to low product count")
+                    break
 
             # Extract products from this page
             page_products = []
             
             for i, product in enumerate(product_elements):
                 try:
+                    # Add tiny delay between products to look more human
+                    if i > 0 and i % 10 == 0:
+                        time.sleep(random.uniform(0.1, 0.3))
+                    
                     # Extract product name using the exact selector from your HTML
                     name = ""
                     name_selectors = [
@@ -730,7 +819,6 @@ def scrape_category(driver, url):
                 break
 
             page += 1
-            time.sleep(random.uniform(0.3, 0.7))
 
         except Exception as e:
             print_progress(f"   ❌ Error on page {page}: {e}")
@@ -739,14 +827,14 @@ def scrape_category(driver, url):
     print_progress(f"✅ Category {category_name} completed: {len(products)} total products")
     return products
 
-def scrape_single_category(url):
+def scrape_single_category(url, category_index=0):
     """Run one category scrape with driver reuse"""
     driver = setup_optimized_driver()
     if not driver:
         return []
 
     try:
-        products = scrape_category(driver, url)
+        products = scrape_category(driver, url, category_index)
         return products
     finally:
         try:
@@ -758,37 +846,56 @@ def scrape_single_category(url):
             time.sleep(0.5)
 
 def scrape_all_categories():
-    """Scrape all categories sequentially"""
+    """Scrape all categories sequentially with enhanced anti-detection"""
     all_products = []
     total_categories = len(CATEGORY_URLS)
     
-    for i, url in enumerate(CATEGORY_URLS, 1):
+    # Shuffle the category URLs to avoid predictable patterns
+    shuffled_urls = CATEGORY_URLS.copy()
+    random.shuffle(shuffled_urls)
+    print_progress(f"📋 Randomized category order to avoid detection patterns")
+    
+    for i, url in enumerate(shuffled_urls, 1):
         try:
             print_progress(f"📊 Progress: Starting {i}/{total_categories} categories")
-            products = scrape_single_category(url)
+            products = scrape_single_category(url, i - 1)
             all_products.extend(products)
             print_progress(f"📊 Progress: {i}/{total_categories} categories completed")
+            
+            # Early termination if we detect we're being blocked consistently
+            if i > 5 and len(all_products) < 50:  # After 5 categories, should have more than 50 products
+                print_progress(f"⚠️ WARNING: Very low product count ({len(all_products)}) after {i} categories - possible blocking")
+                print_progress(f"⚠️ Consider stopping and investigating")
+            
         except Exception as e:
             print_progress(f"❌ Error scraping category {url}: {e}")
         
-        # Shorter delays for GitHub Actions
-        if i < len(CATEGORY_URLS):
-            time.sleep(0.3)
+        # Variable delays between categories
+        if i < len(shuffled_urls):
+            category_delay = random.uniform(2.0, 6.0)
+            # Add extra delay every 10 categories
+            if i % 10 == 0:
+                category_delay += random.uniform(10.0, 20.0)
+                print_progress(f"   💤 Extended delay after {i} categories: {category_delay:.1f}s")
+            time.sleep(category_delay)
 
     return all_products
 
 def save_products(products):
-    """Save scraped data to CSV files"""
+    """Save scraped data to CSV files with enhanced logging"""
     if not products:
+        print_progress("⚠️ No products to save!")
         return
 
-    fieldnames = ["Category", "Product Name", "Price"]  # Removed "Price with Nectar"
+    fieldnames = ["Category", "Product Name", "Price"]
 
     # Save locally
     with open(OUTPUT_FILE, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(products)
+    
+    print_progress(f"💾 Saved {len(products)} products to {OUTPUT_FILE}")
 
     # Save to app folder if possible
     try:
@@ -797,13 +904,15 @@ def save_products(products):
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(products)
-    except:
-        pass
+        print_progress(f"💾 Saved {len(products)} products to {APP_OUTPUT_FILE}")
+    except Exception as e:
+        print_progress(f"⚠️ Could not save to app folder: {e}")
 
 def main():
     env = "GitHub Actions" if detect_environment() else "Local"
-    print_progress(f"🛒 Starting Sainsbury's scraper ({env})")
-    print_progress(f"📋 Categories: {len(CATEGORY_URLS)} | Processing: Sequential")
+    print_progress(f"🛒 Starting ENHANCED Sainsbury's scraper ({env})")
+    print_progress(f"📋 Categories: {len(CATEGORY_URLS)} | Processing: Sequential with anti-detection")
+    print_progress(f"🔧 Anti-bot measures: Random delays, user-agent rotation, blocking detection")
 
     start_time = time.time()
     products = scrape_all_categories()
@@ -814,6 +923,23 @@ def main():
     print_progress(f"\n🎉 COMPLETED!")
     print_progress(f"📊 Total products: {len(products)}")
     print_progress(f"⏱️ Time: {elapsed:.0f}s | Speed: {len(products)/elapsed:.1f} products/sec")
+    
+    # Analysis of results
+    if len(products) < 1000:
+        print_progress(f"⚠️ WARNING: Low product count ({len(products)}) - possible blocking detected")
+    elif len(products) > 10000:
+        print_progress(f"✅ SUCCESS: Good product count indicates successful scraping")
+    
+    # Category breakdown
+    if products:
+        categories = {}
+        for product in products:
+            cat = product.get('Category', 'Unknown')
+            categories[cat] = categories.get(cat, 0) + 1
+        
+        print_progress(f"📊 Top 10 categories by product count:")
+        for cat, count in sorted(categories.items(), key=lambda x: x[1], reverse=True)[:10]:
+            print_progress(f"   - {cat}: {count} products")
 
 if __name__ == "__main__":
     main()

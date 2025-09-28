@@ -101,10 +101,12 @@ jobs:
       timeout-minutes: 140  # Increased from 115 to 140 minutes
       run: |
         cd WebScrape
-        echo "🛒 Starting Sainsbury's scraper..."
-        echo "📋 Mode: Enhanced with real-time progress"
+        echo "🛒 Starting Enhanced Sainsbury's scraper..."
+        echo "📋 Mode: Enhanced with anti-detection & real-time progress"
         echo "🔧 Sequential processing (MAX_THREADS = 1)"
         echo "📄 All categories included"
+        echo "🛡️ Anti-bot measures: Random delays, blocking detection, user-agent rotation"
+        echo "🎯 Target: 10,000+ products (minimum for commit)"
         echo "🕐 Started: $(date)"
         
         # Set display for virtual framebuffer
@@ -118,7 +120,7 @@ jobs:
         echo "Executing: python -u sainsburys.py"
         timeout 8400 python -u sainsburys.py 2>&1 | tee sainsburys.log
         
-        echo "Sainsbury's scraper completed at: $(date)"
+        echo "Enhanced Sainsbury's scraper completed at: $(date)"
     
     - name: Check results and copy CSV
       id: results
@@ -131,7 +133,7 @@ jobs:
         if [ -f "sainsburys.csv" ]; then
           echo "✅ Found sainsburys.csv"
           
-          # Copy to public directory
+          # Copy to public directory regardless of count (for analysis)
           cp sainsburys.csv ../app/public/
           echo "✅ Copied to app/public/"
           
@@ -144,11 +146,17 @@ jobs:
           echo "- Products: $product_count"
           echo "- File size: $file_size"
           echo "- Total lines: $total_lines"
+          echo "- Minimum required: 10,000 products"
           
-          # Check if we actually got products
-          if [ $product_count -gt 0 ]; then
+          # Set outputs for all cases
+          echo "product_count=$product_count" >> $GITHUB_OUTPUT
+          
+          # Check if we meet the minimum threshold for commit
+          if [ $product_count -ge 10000 ]; then
+            echo "✅ SUCCESS: $product_count products ≥ 10,000 minimum threshold"
+            echo "✅ This data will be committed to the repository"
             echo "success=true" >> $GITHUB_OUTPUT
-            echo "product_count=$product_count" >> $GITHUB_OUTPUT
+            echo "should_commit=true" >> $GITHUB_OUTPUT
             
             # Show sample products
             echo ""
@@ -160,16 +168,32 @@ jobs:
             echo "📊 Categories with products:"
             tail -n +2 sainsburys.csv | cut -d',' -f1 | sort | uniq -c | sort -nr | head -10
             
-            # Show performance stats from log
+          elif [ $product_count -gt 0 ]; then
+            echo "⚠️ INSUFFICIENT: $product_count products < 10,000 minimum threshold"
+            echo "⚠️ Data will NOT be committed (likely bot detection occurred)"
+            echo "⚠️ Manual investigation recommended - check logs for blocking indicators"
+            echo "success=false" >> $GITHUB_OUTPUT
+            echo "should_commit=false" >> $GITHUB_OUTPUT
+            
+            # Still show some analysis for debugging
             echo ""
-            echo "📊 Performance stats:"
-            grep -E "Total products:|Total time:|Products per second:" sainsburys.log | tail -3
+            echo "📋 Sample of what was scraped (first 5):"
+            head -6 sainsburys.csv | tail -5
+            
+            echo ""
+            echo "📊 Categories found:"
+            tail -n +2 sainsburys.csv | cut -d',' -f1 | sort | uniq -c | sort -nr | head -5
             
           else
             echo "❌ CSV file created but contains 0 products"
             echo "success=false" >> $GITHUB_OUTPUT
-            echo "product_count=0" >> $GITHUB_OUTPUT
+            echo "should_commit=false" >> $GITHUB_OUTPUT
           fi
+          
+          # Show performance stats from log
+          echo ""
+          echo "📊 Performance stats:"
+          grep -E "Total products:|Time:|products/sec|WARNING|SUCCESS" sainsburys.log | tail -10
           
         else
           echo "❌ No sainsburys.csv found"
@@ -181,6 +205,7 @@ jobs:
           tail -50 sainsburys.log 2>/dev/null || echo "No log file"
           
           echo "success=false" >> $GITHUB_OUTPUT
+          echo "should_commit=false" >> $GITHUB_OUTPUT
           echo "product_count=0" >> $GITHUB_OUTPUT
         fi
     
@@ -188,72 +213,103 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: sainsburys-original-logs
+        name: sainsburys-enhanced-logs-${{ github.run_number }}
         path: |
           WebScrape/sainsburys.log
           WebScrape/sainsburys.py
-        retention-days: 7
+          app/public/sainsburys.csv
+        retention-days: 30
         if-no-files-found: ignore
     
-    - name: Commit changes if successful
-      if: steps.results.outputs.success == 'true' && steps.results.outputs.product_count > 0
+    - name: Commit changes if successful and meets threshold
+      if: steps.results.outputs.should_commit == 'true' && steps.results.outputs.product_count >= 10000
       run: |
         git config --global user.email "actions@github.com"
-        git config --global user.name "GitHub Actions - Sainsbury's Original"
+        git config --global user.name "GitHub Actions - Enhanced Sainsbury's"
         
         # Add CSV file
         git add -f app/public/sainsburys.csv
         
         if ! git diff --staged --quiet; then
-          echo "📝 Committing changes..."
+          echo "📝 Committing changes with ${{ steps.results.outputs.product_count }} products..."
           
-          git commit -m "🛒 Sainsbury's price update (Original Script) - $(date -u '+%Y-%m-%d %H:%M UTC')
+          git commit -m "🛒 Sainsbury's price update (Enhanced Anti-Detection) - $(date -u '+%Y-%m-%d %H:%M UTC')
 
-          Products: ${{ steps.results.outputs.product_count }}
-          Store: Sainsbury's
-          Script: Original sainsburys.py (unmodified)
-          Processing: Sequential (MAX_THREADS = 1)
-          Categories: All included
+          ✅ Products: ${{ steps.results.outputs.product_count }} (≥ 10,000 threshold)
+          🛡️ Store: Sainsbury's (Enhanced Script)
+          🤖 Anti-Detection: Blocking detection, random delays, user-agent rotation
+          📊 Processing: Sequential (MAX_THREADS = 1)
+          📋 Categories: All included with randomized order
           
-          Features:
-          - Undetected ChromeDriver
-          - Enhanced cleanup and version detection
-          - Duplicate detection pagination
-          - Nectar price extraction
+          Enhanced Features:
+          - Real-time blocking detection
+          - Random delays and human-like behavior
+          - User-agent rotation and stealth options
+          - Category shuffling to avoid patterns
+          - Quality threshold enforcement (10K+ products)
           
           Auto-updated via GitHub Actions"
           
           git push origin HEAD:${{ github.ref_name }}
-          echo "✅ Changes pushed successfully"
+          echo "✅ Changes pushed successfully with ${{ steps.results.outputs.product_count }} products"
         else
           echo "ℹ️ No changes to commit"
         fi
     
+    - name: Log insufficient data warning
+      if: steps.results.outputs.product_count > 0 && steps.results.outputs.product_count < 10000
+      run: |
+        echo "⚠️ WARNING: Insufficient data quality detected"
+        echo "- Products found: ${{ steps.results.outputs.product_count }}"
+        echo "- Required minimum: 10,000"
+        echo "- Likely cause: Bot detection by Sainsbury's website"
+        echo "- Recommendation: Check logs and consider manual investigation"
+        echo ""
+        echo "This indicates the enhanced anti-detection measures may need further improvement"
+        echo "or that Sainsbury's has updated their bot detection systems."
+    
     - name: Summary
       if: always()
       run: |
-        echo "## 🛒 Sainsbury's Scraper Summary (Original)" >> $GITHUB_STEP_SUMMARY
+        echo "## 🛒 Enhanced Sainsbury's Scraper Summary" >> $GITHUB_STEP_SUMMARY
         echo "**Run completed:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
-        if [ "${{ steps.results.outputs.success }}" == "true" ]; then
-          echo "### ✅ Success" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ steps.results.outputs.should_commit }}" == "true" ]; then
+          echo "### ✅ Success - Data Committed" >> $GITHUB_STEP_SUMMARY
           echo "- **Products scraped:** ${{ steps.results.outputs.product_count }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Script:** Original sainsburys.py (unmodified)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Processing:** Sequential (MAX_THREADS = 1)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status:** Data committed to repository" >> $GITHUB_STEP_SUMMARY
+          echo "- **Quality threshold:** ✅ Met (≥ 10,000 products)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Script:** Enhanced with anti-detection measures" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ✅ Data committed to repository" >> $GITHUB_STEP_SUMMARY
+          
+        elif [ "${{ steps.results.outputs.product_count }}" -gt "0" ] && [ "${{ steps.results.outputs.product_count }}" -lt "10000" ]; then
+          echo "### ⚠️ Insufficient Data Quality" >> $GITHUB_STEP_SUMMARY
+          echo "- **Products found:** ${{ steps.results.outputs.product_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Quality threshold:** ❌ Not met (< 10,000 products)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Likely cause:** Bot detection by Sainsbury's" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ❌ Data NOT committed" >> $GITHUB_STEP_SUMMARY
+          echo "- **Action needed:** Manual investigation recommended" >> $GITHUB_STEP_SUMMARY
+          
         else
           echo "### ❌ Scraping Failed" >> $GITHUB_STEP_SUMMARY
           echo "- **Error:** Failed to generate usable CSV file" >> $GITHUB_STEP_SUMMARY
-          echo "- **Script:** Original sainsburys.py attempted" >> $GITHUB_STEP_SUMMARY
-          echo "- **Logs:** Check uploaded artifacts for details" >> $GITHUB_STEP_SUMMARY
+          echo "- **Products:** 0" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ❌ Complete failure" >> $GITHUB_STEP_SUMMARY
+          echo "- **Action needed:** Check logs for technical issues" >> $GITHUB_STEP_SUMMARY
         fi
         
         echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🛡️ Enhanced Anti-Detection Features" >> $GITHUB_STEP_SUMMARY
+        echo "- **Blocking Detection:** Real-time detection of CAPTCHAs and soft blocks" >> $GITHUB_STEP_SUMMARY
+        echo "- **Random Behavior:** Variable delays, shuffled categories, human-like scrolling" >> $GITHUB_STEP_SUMMARY
+        echo "- **Stealth Options:** User-agent rotation, additional Chrome stealth flags" >> $GITHUB_STEP_SUMMARY
+        echo "- **Quality Control:** 10,000+ product threshold before committing data" >> $GITHUB_STEP_SUMMARY
+        echo "- **Early Detection:** Monitoring for patterns indicating bot detection" >> $GITHUB_STEP_SUMMARY
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 📋 Technical Details" >> $GITHUB_STEP_SUMMARY
-        echo "- **Driver:** Undetected ChromeDriver" >> $GITHUB_STEP_SUMMARY
+        echo "- **Driver:** Undetected ChromeDriver with enhanced stealth" >> $GITHUB_STEP_SUMMARY
         echo "- **Mode:** Headless (GitHub Actions)" >> $GITHUB_STEP_SUMMARY
-        echo "- **Processing:** Sequential (no threading)" >> $GITHUB_STEP_SUMMARY
-        echo "- **Categories:** All categories from original script" >> $GITHUB_STEP_SUMMARY
-        echo "- **Modifications:** None - using original file" >> $GITHUB_STEP_SUMMARY
-        echo "- **Timeout:** 2 hours total" >> $GITHUB_STEP_SUMMARY
+        echo "- **Processing:** Sequential with randomized category order" >> $GITHUB_STEP_SUMMARY
+        echo "- **Timeout:** 2.3 hours total" >> $GITHUB_STEP_SUMMARY
+        echo "- **Retention:** Logs kept for 30 days" >> $GITHUB_STEP_SUMMARY
