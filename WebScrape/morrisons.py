@@ -61,7 +61,7 @@ class OptimizedMorrisonsProductScraper:
             WebDriverWait(self.driver, 3).until(
                 EC.element_to_be_clickable((By.ID, "onetrust-accept-btn-handler"))
             ).click()
-            time.sleep(1)  # Reduced from 2 seconds
+            time.sleep(1.5)  # Reduced from 2 seconds
         except TimeoutException:
             pass  # Continue if no cookie banner
 
@@ -121,7 +121,7 @@ class OptimizedMorrisonsProductScraper:
             
             # Scroll down
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(1.0)  # Reduced from 3-4 seconds
+            time.sleep(2.0)  # Reduced from 3-4 seconds
             
             new_height = self.driver.execute_script("return document.body.scrollHeight")
             scroll_count += 1
