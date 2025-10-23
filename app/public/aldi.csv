@@ -1,8 +1,6 @@
 category,name,price
-Fresh Food,ASHFIELDS British Chicken Drumsticks,£3.79
-Fresh Food,OAKHURST Tennessee Pork Ribs,£3.99
 Fresh Food,ASHFIELDS Nduja Pork Meatballs 12 Pack,£2.49
-Fresh Food,SPECIALLY SELECTED Caramelised Red Onion Pork Sausages 10 Pack,£3.69
+Fresh Food,SPECIALLY SELECTED Caramelised Red Onion Pork Sausages 10 Pack,£3.49
 Fresh Food,NATURE'S PICK Ripe & Ready Kiwis,£1.39
 Fresh Food,NATURE'S PICK Kiwis,£1.19
 Fresh Food,NATURE'S PICK Large Ripe & Ready Avocado,£0.88
@@ -11,7 +9,7 @@ Fresh Food,NATURE'S PICK Ripen At Home Avocados,£1.29
 Fresh Food,NATURE'S PICK Large Mango,£0.88
 Fresh Food,NATURE'S PICK Ripe & Ready Mangoes,£1.65
 Fresh Food,NATURE'S PICK Galia Melon,£1.49
-Fresh Food,NATURE'S PICK Red Grapefruit,£0.45
+Fresh Food,NATURE'S PICK Red Grapefruit,£0.44
 Fresh Food,NATURE'S PICK Ginger,£0.99
 Fresh Food,NATURE'S PICK White Seedless Grapes,£1.79
 Fresh Food,NATURE'S PICK Seedless Red Grapes,£1.79
@@ -25,7 +23,7 @@ Fresh Food,NATURE'S PICK Bananas,£0.78
 Fresh Food,NATURE'S PICK Banana,£0.16
 Fresh Food,NATURE'S PICK Mini Bananas,£0.88
 Fresh Food,NATURE'S PICK Pineapple,£0.98
-Fresh Food,EVERYDAY ESSENTIALS Wonky Lemons,£0.79
+Fresh Food,EVERYDAY ESSENTIALS Wonky Lemons,£0.89
 Fresh Food,NATURE'S PICK XL Ripe & Ready Avocado,£1.19
 Fresh Food,NATURE'S PICK Pink Lady Apples,£2.75
 Fresh Food,NATURE'S PICK Mini Easy Peelers,£0.99
@@ -35,13 +33,12 @@ Fresh Food,NATURE'S PICK Ripe & Ready Conference Pears,£1.85
 Fresh Food,NATURE'S PICK Cucumber,£0.89
 Fresh Food,ORGANIC Cucumber,£1.05
 Fresh Food,NATURE'S PICK Baby Cucumbers,£0.95
-Fresh Food,NATURE'S PICK Garlic,£0.89
+Fresh Food,NATURE'S PICK Garlic,£0.69
 Fresh Food,NATURE'S PICK Red Pepper,£0.65
-Fresh Food,NATURE'S PICK Baby Plum Tomatoes,£0.89
-Fresh Food,EVERYDAY ESSENTIALS Baby Plum Tomatoes,£0.68
+Fresh Food,EVERYDAY ESSENTIALS Baby Plum Tomatoes,£0.62
 Fresh Food,NATURE'S PICK Sweet Mini Peppers,£1.29
 Fresh Food,EVERYDAY ESSENTIALS Wonky Mixed Peppers,£1.60
-Fresh Food,NATURE'S PICK Mixed Peppers,£1.19
+Fresh Food,NATURE'S PICK Mixed Peppers,£1.69
 Fresh Food,NATURE'S PICK Sweet Mixed Peppers,£1.79
 Fresh Food,NATURE'S PICK Cherry Tomatoes,£0.79
 Fresh Food,EVERYDAY ESSENTIALS Cherry Tomatoes,£0.62
@@ -58,7 +55,7 @@ Fresh Food,NATURE'S PICK Nectarines,£1.89
 Fresh Food,NATURE'S PICK Limes,£1.18
 Fresh Food,NATURE'S PICK Ripen at Home Plums,£0.95
 Fresh Food,NATURE'S PICK Asparagus Tips,£1.40
-Fresh Food,NATURE'S PICK Ripen at Home Mini Pears 5 Pack,£0.99
+Fresh Food,NATURE'S PICK Ripen at Home Mini Pears 5 Pack,£0.69
 Fresh Food,NATURE'S PICK Golden Delicious Apples,£1.59
 Fresh Food,NATURE'S PICK Granny Smith Apples,£1.59
 Fresh Food,NATURE'S PICK Jazz Apples,£2.09
@@ -110,7 +107,7 @@ Fresh Food,NATURE'S PICK British Leeks,£1.39
 Fresh Food,NATURE'S PICK British Little Gem Lettuce 2 Pack,£0.77
 Fresh Food,NATURE'S PICK Mangetout,£0.95
 Fresh Food,NATURE'S PICK Ready to Roast Mediterranean Style Vegetables,£1.59
-Fresh Food,NATURE'S PICK British Mini Apples,£0.99
+Fresh Food,NATURE'S PICK British Mini Apples,£0.69
 Fresh Food,NATURE'S PICK British Miniature Potatoes,£0.79
 Fresh Food,ORGANIC Broccoli,£1.19
 Fresh Food,NATURE'S PICK British Parsnips,£0.74
@@ -122,34 +119,34 @@ Fresh Food,NATURE'S PICK Red Onions,£0.95
 Fresh Food,NATURE'S PICK British Red Potatoes,£1.95
 Fresh Food,ROOSTERS Red Rooster Potatoes,£2.39
 Fresh Food,NATURE'S PICK British Romaine Lettuce,£1.09
-Fresh Food,NATURE'S PICK British Royal Gala Apples,£1.15
+Fresh Food,NATURE'S PICK British Royal Gala Apples,£1.59
 Fresh Food,SPECIALLY SELECTED Extra Fine Green Beans,£1.35
 Fresh Food,SPECIALLY SELECTED Piccolato Tomatoes,£1.59
 Fresh Food,SPECIALLY SELECTED British Grown Raspberries,£2.35
 Fresh Food,SPECIALLY SELECTED Regal Vine Tomatoes,£1.59
 Fresh Food,SPECIALLY SELECTED Mini San Marzano Tomatoes,£1.49
 Fresh Food,SPECIALLY SELECTED British Grown Red Ruby Strawberries,£2.35
-Fresh Food,NATURE'S PICK British Salad Potatoes,£0.89
+Fresh Food,NATURE'S PICK British Salad Potatoes,£1.19
 Fresh Food,NATURE'S PICK Savoy Cabbage,£0.75
-Fresh Food,NATURE'S PICK Scottish Shredded Kale,£0.95
+Fresh Food,NATURE'S PICK Scottish Shredded Kale,£0.89
 Fresh Food,NATURE'S PICK British Shredded Spring Greens,£1.49
 Fresh Food,NATURE'S PICK Sliced Mushrooms,£0.95
 Fresh Food,NATURE'S PICK Spring Onions,£0.69
 Fresh Food,NATURE'S PICK Strawberries,£1.89
-Fresh Food,NATURE'S PICK Strawberries,£2.49
+Fresh Food,NATURE'S PICK Strawberries,£2.55
 Fresh Food,NATURE'S PICK Strawberries,£3.39
 Fresh Food,NATURE'S PICK British Stringless Beans,£0.99
-Fresh Food,NATURE'S PICK British Sugar Snap Peas,£0.69
-Fresh Food,NATURE'S PICK Swede,£0.62
+Fresh Food,NATURE'S PICK British Sugar Snap Peas,£0.95
+Fresh Food,NATURE'S PICK Swede,£0.49
 Fresh Food,NATURE'S PICK British Sweet Gem Lettuce,£0.95
 Fresh Food,NATURE'S PICK Sweet Leaf Salad,£0.75
 Fresh Food,NATURE'S PICK British Sweetcorn,£1.29
-Fresh Food,NATURE'S PICK Sweetheart Cabbage,£0.59
+Fresh Food,NATURE'S PICK Sweetheart Cabbage,£0.49
 Fresh Food,NATURE'S PICK British Tenderstem Broccoli,£1.49
 Fresh Food,NATURE'S PICK British Trimmed Brussel Sprouts,£1.19
 Fresh Food,NATURE'S PICK Washed & Ready to Cook Vegetable Medley,£1.39
 Fresh Food,NATURE'S PICK Welsh Leeks,£1.39
-Fresh Food,NATURE'S PICK British Closed Cup Mushrooms,£1.29
+Fresh Food,NATURE'S PICK British Closed Cup Mushrooms,£0.99
 Fresh Food,NATURE'S PICK British  White Potatoes,£1.65
 Fresh Food,NATURE'S PICK Wild Rocket,£0.79
 Fresh Food,NATURE'S PICK Watercress Spinach & Rocket Salad,£0.79
@@ -187,7 +184,7 @@ Fresh Food,THE FISHMONGER Cooked & Peeled Coldwater Prawns,£1.99
 Fresh Food,ASHFIELDS Diced Chicken Breast,£2.99
 Fresh Food,ASHFIELDS British Pork Crackling Leg Joint,£2.65/0.5 kg
 Fresh Food,ASHFIELDS British Beef Roasting Joint 21 Day Matured,£5.00/0.5 kg
-Fresh Food,EVERYDAY ESSENTIALS British Beef Steak 21 Day Matured,£3.49
+Fresh Food,EVERYDAY ESSENTIALS British Beef Steak 21 Day Matured,£3.29
 Fresh Food,ASHFIELDS British Pork Belly Slices,£3.49
 Fresh Food,ASHFIELDS British Pork Shoulder Joint,£1.90/0.5 kg
 Fresh Food,ASHFIELDS Chicken Breast Fillets 2 Pack,£2.15
@@ -208,7 +205,7 @@ Fresh Food,THE FISHMONGER Boneless Smoked Haddock Fillets 2 Pack,£3.89
 Fresh Food,ASHFIELDS British Pork Loin Joint,£2.90/0.5 kg
 Fresh Food,ASHFIELDS British Beef Quarter Pounders 4 Pack,£3.49
 Fresh Food,ASHFIELDS British Reduced Fat* Beef Quarter Pounders 5% Fat 4 Pack,£3.99
-Fresh Food,ASHFIELDS Diced Lamb,£5.89
+Fresh Food,ASHFIELDS Diced Lamb,£5.49
 Fresh Food,ASHFIELDS British Diced Beef,£7.39
 Fresh Food,ASHFIELDS British Beef Meatballs 24 Pack,£4.99
 Fresh Food,SPECIALLY SELECTED The Ultimate Burger,£3.89
@@ -240,7 +237,6 @@ Fresh Food,SPECIALLY SELECTED 100% British Beef Wagyu Sirloin Steak,£7.99
 Fresh Food,SPECIALLY SELECTED 100% British Beef Wagyu Ribeye Steak,£8.49
 Fresh Food,SPECIALLY SELECTED 100% British Beef Wagyu Rump Steak,£6.49
 Fresh Food,SPECIALLY SELECTED 100% British Beef Wagyu Fillet Steak,£9.99
-Fresh Food,ASHFIELDS Thin Cut Beef Steaks 30 Day Matured,£3.99
 Fresh Food,NATURE'S PICK Melon Medley,£1.69
 Fresh Food,NATURE'S PICK Mango Chunks,£2.19
 Fresh Food,EVERYDAY ESSENTIALS Wonky Apples,£0.99
@@ -249,7 +245,6 @@ Fresh Food,NATURE'S PICK Sweet & Crispy,£0.99
 Fresh Food,NATURE'S PICK Caesar Salad Kit,£1.39
 Fresh Food,ASHFIELDS British Wagyu Beef Burgers,£3.99
 Fresh Food,NATURE'S PICK Rainbow Salad,£1.09
-Fresh Food,NATURE'S PICK Pak Choi,£1.29
 Fresh Food,THE FISHMONGER Smoked Salmon Slices,£2.49
 Fresh Food,ASHFIELDS Chicken Drum Fillets,£2.99
 Fresh Food,SPECIALLY SELECTED Piccolato Tomatoes,£2.59
@@ -268,7 +263,6 @@ Fresh Food,OAKHURST Slow Cooked BBQ Pork Ribs,£4.69
 Fresh Food,SPECIALLY SELECTED Wild Caught Yellowfin Tuna Steak,£4.99
 Fresh Food,NATURE'S PICK Pineapple Chunks,£1.49
 Fresh Food,ASHFIELDS Smash Burgers 4 Pack,£3.39
-Fresh Food,SPECIALLY SELECTED Black Pudding,£0.49
 Fresh Food,EVERYDAY ESSENTIALS Wonky Blackberries,£1.89
 Fresh Food,"NATURE'S PICK Melon, Mango & Pineapple Fingers",£1.79
 Fresh Food,"NATURE'S PICK Apples, Grapes & Cheese",£0.95
@@ -281,7 +275,6 @@ Fresh Food,ASHFIELDS British Beef Mince 20% Fat,£3.25
 Fresh Food,ASHFIELDS British Lamb Mince 20% Fat,£5.49
 Fresh Food,EVERYDAY ESSENTIALS Beef Mince 25% Fat,£3.09
 Fresh Food,ASHFIELDS British Pork Mince 12% Fat,£2.25
-Fresh Food,SPECIALLY SELECTED Thick Cut Rump Steaks,£6.29
 Fresh Food,NATURE'S PICK House Salad,£0.62
 Fresh Food,OAKHURST Slow Cooked Lamb Shanks with Mint Gravy,£7.89
 Fresh Food,NATURE'S PICK Pomegranate Seeds,£1.89
@@ -290,32 +283,32 @@ Fresh Food,ASHFIELDS Large Whole Chicken,£4.79
 Fresh Food,ASHFIELDS Medium Whole Chicken,£4.25
 Fresh Food,ASHFIELDS Extra Large Whole Chicken,£5.49
 Fresh Food,SPECIALLY SELECTED Cavolo Nero,£0.95
-Fresh Food,ASHFIELDS XXL Rump Steaks,£6.99
 Fresh Food,"NATURE'S PICK Broccoli, Carrots, Baby Corn & Green Beans",£1.75
 Fresh Food,SPECIALLY SELECTED Premium Sugarplum Tomatoes 220g,£1.59
 Fresh Food,SPECIALLY SELECTED Cooked & Peeled Extra Large King Prawns,£2.99
+Fresh Food,OAKHURST Gammon Shanks With Honey & Mustard Sauce,£4.69
 Fresh Food,ASHFIELDS Thick Cut Big Daddy Rump Steak 30 Day Matured,£7.49
 Fresh Food,SPECIALLY SELECTED Beef Encroute,£4.99
 Fresh Food,NATURE'S PICK Loose Garlic,£0.37
 Fresh Food,SPECIALLY SELECTED Orange Vine Tomatoes,£1.59
 Fresh Food,ORGANIC Organic Carrots,£0.99
 Fresh Food,SPECIALLY SELECTED Rich & Succulent Trout Fillets 2 Pack,£3.99
-Fresh Food,OAKHURST Salted Chilli Lamb Shoulder Chops,£5.59
 Fresh Food,NATURE'S PICK Easy Peelers,£1.19
-Fresh Food,NATURE'S PICK Lemons,£1.49
+Fresh Food,NATURE'S PICK Lemons,£1.59
 Fresh Food,SPECIALLY SELECTED Wagyu Mince,£5.49
 Fresh Food,ASHFIELDS Pork Patties,£2.09
 Fresh Food,ASHFIELDS British Beef Mince 3% Fat,£4.99
 Fresh Food,SPECIALLY SELECTED Ranch Steaks with Butters,£5.99
+Fresh Food,SPECIALLY SELECTED Peppered Beef Grillsteaks,£2.69
 Fresh Food,SPECIALLY SELECTED Sockeye Salmon Fillets,£4.69
 Fresh Food,NATURE'S PICK Apple Snack Pack,£0.39
 Fresh Food,NATURE'S PICK Apple & Grape Snack Pack,£0.39
 Fresh Food,"NATURE'S PICK Peas, Cabbage & Tenderstem Broccoli",£1.79
-Fresh Food,NATURE'S PICK Mixed Chillies,£0.57
-Fresh Food,NATURE'S PICK Red Chillies,£0.57
+Fresh Food,NATURE'S PICK Mixed Chillies,£0.55
+Fresh Food,NATURE'S PICK Red Chillies,£0.55
 Fresh Food,NATURE'S PICK White Cabbage,£0.79
 Fresh Food,NATURE'S PICK Red Cabbage,£0.79
-Fresh Food,NATURE'S PICK British Echalion Shallots 400g,£0.69
+Fresh Food,NATURE'S PICK British Echalion Shallots 400g,£1.15
 Fresh Food,EVERYDAY ESSENTIALS Smoked Gammon Joint,£2.15/0.5 kg
 Fresh Food,EVERYDAY ESSENTIALS Unsmoked Gammon Joint Typically 1kg,£2.15/0.5 kg
 Fresh Food,SPECIALLY SELECTED 100% British Pork Dry Cured Smoked Back Bacon 8 Pack,£2.49
@@ -423,7 +416,7 @@ Fresh Food,ASHFIELDS British Minted Lamb Kebabs 4 Pack,£3.09
 Fresh Food,ASHFIELDS 30 Day Matured Rump Steaks with a Peppercorn Melt 2 Pack,£6.99
 Fresh Food,ASHFIELDS 30 Day Matured Rump Steaks with a Bone Marrow Melt 2 Pack,£6.99
 Fresh Food,ASHFIELDS 30 Day Matured Rump Steaks with a Chimichurri Melt 2 Pack,£6.99
-Fresh Food,SPECIALLY SELECTED Wagyu Beef Meatballs,£4.19
+Fresh Food,SPECIALLY SELECTED Wagyu Beef Meatballs,£3.99
 Fresh Food,SPECIALLY SELECTED 100% British Pork Dry Cured Smoked Streaky Bacon 14 Pack,£2.29
 Fresh Food,SPECIALLY SELECTED 100% British Pork Dry Cured Unsmoked Streaky Bacon 14 Pack,£2.29
 Fresh Food,SPECIALLY SELECTED Chicken Sausages 6 Pack,£2.39
@@ -476,7 +469,6 @@ Fresh Food,SPECIALLY SELECTED 100% Scotch Beef Lean Aberdeen Angus Steak Mince 5
 Fresh Food,ASHFIELDS British Beef Braising Steaks,£3.89
 Fresh Food,SPECIALLY SELECTED Specially Selected Salt Dry Aged Aberdeen Angus Scotch Beef Roasting Joint Typically 1.525kg,£6.75/0.5 kg
 Fresh Food,THE FISHMONGER Hake Mornay Topped with Crunchy Breadcrumbs,£3.99
-Fresh Food,THE FISHMONGER Salmon & Watercress Topped with Crunchy Breadcrumbs,£3.99
 Fresh Food,ROOSTERS Southern Fried Chicken Goujons,£3.19
 Fresh Food,ROOSTERS Breaded Chicken Goujons,£3.19
 Fresh Food,SPECIALLY SELECTED Specially Selected Salmon Gravadlax 120g,£2.89
@@ -505,19 +497,15 @@ Fresh Food,ASHFIELDS New Zealand Lamb Chops,£5.49
 Fresh Food,SPECIALLY SELECTED Denver Premium Wagyu Steak,£6.49
 Fresh Food,SPECIALLY SELECTED Flat Iron Premium Wagyu Steak,£6.49
 Fresh Food,SPECIALLY SELECTED Picanha Premium Wagyu Steak,£6.49
-Fresh Food,ASHFIELDS Flavoured Italian Mini Meatballs,£3.39
-Fresh Food,ASHFIELDS Flavoured Salt & Pepper Mini Meatballs,£3.39
+Fresh Food,ASHFIELDS Flavoured Italian Mini Meatballs,£2.99
+Fresh Food,ASHFIELDS Flavoured Salt & Pepper Mini Meatballs,£2.99
 Fresh Food,SPECIALLY SELECTED Wagyu Joint,£14.99
-Fresh Food,GRESSINGHAM Duck Legs 2 Pack,£3.99
-Fresh Food,GRESSINGHAM Duck Breast Fillets,£5.49
-Fresh Food,ASIA GREEN GARDEN Crispy Aromatic Spatchcock Duck with Pancakes,£7.99
 Fresh Food,NATURE'S PICK Red Spring Onions,£0.89
 Fresh Food,ASHFIELDS XXL Pork Shoulder Steak,£5.49
 Fresh Food,NATURE'S PICK Blackberries,£2.89
 Fresh Food,ASHFIELDS Irish Style Pork Sausages,£1.35
-Fresh Food,OAKHURST Gammon Shanks With Honey & Mustard Sauce,£4.69
-Fresh Food,SPECIALLY SELECTED Peppered Beef Grillsteaks,£2.69
-Fresh Food,NATURE'S PICK British Shallots 400g,£0.69
+Fresh Food,NATURE'S PICK Blueberries,£3.99
+Fresh Food,NATURE'S PICK British Shallots 400g,£1.15
 Fresh Food,ASHFIELDS Teriyaki Boneless Pork Ribs,£3.49
 Fresh Food,ASHFIELDS Tandoori Marinated Shoulder Steaks,£3.49
 Fresh Food,ASHFIELDS Butter Boneless Chicken Joint,£4.99
@@ -526,8 +514,8 @@ Fresh Food,ASHFIELDS Smoky Chicken Hot Dogs,£3.49
 Fresh Food,ASHFIELDS Piri Piri Chicken Hot Dogs,£3.49
 Fresh Food,ASHFIELDS Chinese BBQ Mini Ribs,£3.59
 Fresh Food,ASHFIELDS Asian BBQ Mini Ribs,£3.59
-Fresh Food,NATURE'S PICK Milk Chocolate Salted Caramel Coated Apple,£0.95
-Fresh Food,NATURE'S PICK White Chocolate Marshmallow Coated Apple,£0.95
+Fresh Food,NATURE'S PICK Milk Chocolate Salted Caramel Coated Apple,£0.79
+Fresh Food,NATURE'S PICK White Chocolate Marshmallow Coated Apple,£0.79
 Fresh Food,PINK LADY Pink Lady Kids Apples,£1.89
 Fresh Food,"READY, SET…COOK! British Basil Pot",£0.79
 Fresh Food,"READY, SET…COOK! Washed & Ready to Cook Straight to Wok Beansprouts",£0.79
@@ -545,8 +533,8 @@ Fresh Food,HALLOWEEN AAAHMAZING Giant Pumpkin,£5.99
 Fresh Food,HALLOWEEN AAAHMAZING Large Pumpkin,£1.59
 Fresh Food,"READY, SET…COOK! Sweet & Crunchy Stir Fry Family Size Pack",£1.29
 Fresh Food,HALLOWEEN AAAHMAZING Medium Pumpkin,£0.65
-Fresh Food,HALLOWEEN AAAHMAZING Mixed Squash,£0.69
-Fresh Food,HALLOWEEN AAAHMAZING Munchkin Pumpkin,£0.45
+Fresh Food,HALLOWEEN AAAHMAZING Mixed Squash,£0.95
+Fresh Food,HALLOWEEN AAAHMAZING Munchkin Pumpkin,£0.42
 Fresh Food,BUTCHERS SELECT Pork Sausages 8 Pack,£1.79
 Fresh Food,ASHFIELD Black Pudding Slices 4 Pack,£0.95
 Fresh Food,"READY, SET…COOK! Crispy Aromatic Half Duck with Pancakes",£6.49
@@ -569,7 +557,7 @@ Fresh Food,"READY, SET…COOK! Mushroom Stir Fry",£0.89
 Fresh Food,"READY, SET…COOK! Sweet Chilli Stir Fry Sauce",£0.79
 Fresh Food,"READY, SET…COOK! Plum & Hoisin Stir Fry Sauce",£0.79
 Fresh Food,"READY, SET…COOK! Chow Mein Stir Fry Sauce",£0.79
-Fresh Food,HALLOWEEN AAAHMAZING Novelty Pumpkin,£1.89
+Fresh Food,HALLOWEEN AAAHMAZING Novelty Pumpkin,£1.69
 Fresh Food,"READY, SET…COOK! Teriyaki Stir Fry Sauce",£0.79
 Bakery,VILLAGE BAKERY Bake at Home White Baguettes,£0.89
 Bakery,VILLAGE BAKERY Bake at Home White Rolls,£0.89
@@ -801,13 +789,14 @@ Chilled Food,MEREVALE British Medium Free Range Eggs 12 Pack,£2.49
 Chilled Food,MEREVALE British Free Range Mixed Weight Eggs 15 Pack,£2.69
 Chilled Food,MEREVALE British Very Large Free Range Eggs 6 Pack,£1.99
 Chilled Food,ACTILEAF Barista Style Oat Drink,£1.19
+Chilled Food,BROOKLEA Vanilla And Strawberry Yogurt With Biscuit Pieces Split Pots 6 pack,£2.49
 Chilled Food,GREENVALE Valley Spreadable,£1.99
 Chilled Food,GREENVALE Perfect for Cakes Spread,£1.09
 Chilled Food,COWBELLE Lactose Free Milk,£0.99
 Chilled Food,GREENVALE Ready Rolled Pizza Dough,£1.09
 Chilled Food,COWBELLE Filtered British Whole Milk,£1.75
 Chilled Food,EMPORIUM Dewlay Cheesemakers Crumbly Lancashire Cheese,£1.89
-Chilled Food,EMPORIUM Belton Farm Crumbly Cheshire Cheese,£1.89
+Chilled Food,EMPORIUM Belton Farm Crumbly Cheshire Cheese,£1.99
 Chilled Food,COWBELLE Organic Semi Skimmed Milk 1.7% Fat,£1.99
 Chilled Food,EMPORIUM British Mild Cheddar Cheese,£2.79
 Chilled Food,NORDPAK Slightly Salted Spreadable Butter Blended with Rapeseed Oil,£2.18
@@ -830,7 +819,6 @@ Chilled Food,EVERYDAY ESSENTIALS Unsweetened Soya Drink,£0.59
 Chilled Food,EVERYDAY ESSENTIALS Skimmed UHT Milk,£0.69
 Chilled Food,EVERYDAY ESSENTIALS Semi Skimmed UHT Milk,£0.69
 Chilled Food,COWBELLE Lush British Strawberry Flavoured 1% Fat Milk,£0.95
-Chilled Food,COWBELLE Lush British Banana Flavoured 1% Fat Milk,£0.95
 Chilled Food,EMPORIUM Cheese 'a' Peel 4 Pack,£1.09
 Chilled Food,CARLOS Takeaway Stuffed Crust Cheese Feast Pizza,£3.99
 Chilled Food,CARLOS Takeaway Fully Loaded Meat Feast Pizza,£3.99
@@ -849,7 +837,7 @@ Chilled Food,CUCINA Spinach & Ricotta Tortelloni,£1.69
 Chilled Food,SPECIALLY SELECTED GASTRO British Potatoes Mashed Potato,£1.59
 Chilled Food,CUCINA Beef Lasagne Family Pack,£4.49
 Chilled Food,SPECIALLY SELECTED Deli Ham,£2.59
-Chilled Food,EMPORIUM Mascarpone,£1.39
+Chilled Food,EMPORIUM Mascarpone,£1.59
 Chilled Food,SPECIALLY SELECTED Burrata,£1.99
 Chilled Food,SPECIALLY SELECTED Mozzarella Di Bufala Campana PDO,£0.99
 Chilled Food,SPECIALLY SELECTED GASTRO Potato Dauphinoise,£2.39
@@ -912,7 +900,6 @@ Chilled Food,SPECIALLY SELECTED Chicken Tikka Pocket Wrap,£2.75
 Chilled Food,CRESTWOOD Deep Filled Chicken & Gravy Pie For One,£1.65
 Chilled Food,CRESTWOOD Deep Filled Steak Pie For One,£1.65
 Chilled Food,CRESTWOOD Deep Filled Steak & Kidney Pie For One,£1.65
-Chilled Food,CRESTWOOD Cheese & Bacon Sausage Rolls 9 Pack,£1.29
 Chilled Food,CRESTWOOD Pork Sausage Rolls 9 Pack,£1.29
 Chilled Food,CUCINA Hot Pepperoni 24 Slices,£1.09
 Chilled Food,CUCINA Mild Pepperoni 24 Slices,£1.09
@@ -973,9 +960,7 @@ Chilled Food,EAT & GO Cheese & Onion Sandwich,£1.29
 Chilled Food,EAT & GO Egg & Cress Sandwich,£1.29
 Chilled Food,EAT & GO Smoked Ham Sandwich,£1.29
 Chilled Food,SPECIALLY SELECTED Cherrywood Smoked Bacon & Cheddar Quiche,£3.29
-Chilled Food,SPECIALLY SELECTED Mature Cheddar & Caramelised Onion Quiche,£3.29
 Chilled Food,CRESTWOOD Mini Pork & Pickle Pies 6 Pack,£1.95
-Chilled Food,CRESTWOOD Tomato & Chilli Pork Pies 6 Pack,£1.95
 Chilled Food,SPECIALLY SELECTED Cottage Pie,£5.49
 Chilled Food,SPECIALLY SELECTED GASTRO Fish Pie,£5.49
 Chilled Food,SPECIALLY SELECTED Cheese & Caramelised Onion Rolls 4 Pack,£2.49
@@ -1042,7 +1027,6 @@ Chilled Food,EAT & GO BLT Deeper Fill Sandwich,£2.19
 Chilled Food,EAT & GO Chicken & Chorizo Deeper Fill Sandwich,£2.19
 Chilled Food,ASHFIELD FARM Ready to Eat British Chicken Breast 6 Slices,£1.49
 Chilled Food,ASHFIELD FARM Ready to Eat British Turkey Breast 6 Slices,£1.49
-Chilled Food,CRESTWOOD Three Cheese & Onion Quiche,£1.99
 Chilled Food,CRESTWOOD Quiche Lorraine,£1.99
 Chilled Food,CRESTWOOD Broccoli Cheese & Tomato Quiche,£1.99
 Chilled Food,ASHFIELDS British Cooked Ham 10 Slices,£0.85
@@ -1078,13 +1062,12 @@ Chilled Food,THE DELI Italian Inspired Calabria Ham 6 Slices,£1.35
 Chilled Food,THE DELI Italian Inspired Genoa Ham 6 Slices,£1.35
 Chilled Food,THE DELI Italian Inspired Roma Ham 6 Slices,£1.35
 Chilled Food,THE DELI Italian Inspired Sicilian Ham 6 Slices,£1.35
-Chilled Food,SPECIALLY SELECTED Katsu Chicken Cali Rolls Sushi,£2.89
 Chilled Food,SPECIALLY SELECTED British Butter Basted Roast Chicken Breast 4 Slices,£2.19
 Chilled Food,SPECIALLY SELECTED British Farm Assured Stuffing Topped Roast Chicken 4 Slices,£2.19
-Chilled Food,INSPIRED CUISINE Peri Peri Chicken Bowl,£2.55
-Chilled Food,INSPIRED CUISINE Jerk Chicken,£2.55
-Chilled Food,INSPIRED CUISINE Korean BBQ Chicken Bowl,£2.55
-Chilled Food,INSPIRED CUISINE Firecracker Chicken Bowl,£2.55
+Chilled Food,INSPIRED CUISINE Peri Peri Chicken Bowl,£2.69
+Chilled Food,INSPIRED CUISINE Jerk Chicken,£2.69
+Chilled Food,INSPIRED CUISINE Korean BBQ Chicken Bowl,£2.69
+Chilled Food,INSPIRED CUISINE Firecracker Chicken Bowl,£2.69
 Chilled Food,CRESTWOOD Chicken Poppers,£1.49
 Chilled Food,CRESTWOOD Southern Fried Chicken Straws,£1.49
 Chilled Food,CRESTWOOD Mini Savoury Eggs,£1.49
@@ -1200,7 +1183,7 @@ Chilled Food,EMPORIUM Dutch Emmental Cheese 16 Slices,£3.15
 Chilled Food,EMPORIUM Dutch Maasdam Cheese 16 Slices,£3.15
 Chilled Food,EMPORIUM Dutch Edam Cheese 16 Slices,£3.15
 Chilled Food,EMPORIUM Dutch Gouda Cheese 16 Slices,£3.15
-Chilled Food,SPECIALLY SELECTED Sicilian Lemon Luxury Yogurt 150g,£0.65
+Chilled Food,SPECIALLY SELECTED Sicilian Lemon Luxury Yogurt,£0.65
 Chilled Food,SPECIALLY SELECTED Yellow Peach Luxury Yogurt,£0.65
 Chilled Food,SPECIALLY SELECTED Strawberry & Cream Luxury Yogurt,£0.65
 Chilled Food,SPECIALLY SELECTED Raspberry & Cream Luxury Yogurt,£0.65
@@ -1217,8 +1200,8 @@ Chilled Food,SPECIALLY SELECTED West Country Extra Mature Cheddar Cheese,£3.39
 Chilled Food,SPECIALLY SELECTED West Country Vintage Cheddar Cheese,£3.39
 Chilled Food,DESSERT MENU Strawberry Trifle,£2.55
 Chilled Food,DESSERT MENU Chocolate Trifle,£2.55
-Chilled Food,SPECIALLY SELECTED Shropshire Blue Blue Stilton,£2.49
-Chilled Food,SPECIALLY SELECTED Long Clawson Mature Stilton Blue Stilton,£2.49
+Chilled Food,SPECIALLY SELECTED Shropshire Blue Blue Stilton,£2.69
+Chilled Food,SPECIALLY SELECTED Long Clawson Mature Stilton Blue Stilton,£2.69
 Chilled Food,"SPECIALLY SELECTED Tapas Selection, Chargrilled Spanish Chorizo",£1.99
 Chilled Food,"SPECIALLY SELECTED Tapas Selection, Meatballs Albondigas",£1.99
 Chilled Food,"SPECIALLY SELECTED Tapas Selection, Potato & Onion Tortilla",£1.99
@@ -1229,9 +1212,6 @@ Chilled Food,DESSERT MENU Chocolate Mousse 6 Pack,£0.95
 Chilled Food,DESSERT MENU Strawberry Mousse 6 Pack,£0.95
 Chilled Food,DESSERT MENU Strawberry Scottish Tarts,£1.59
 Chilled Food,DESSERT MENU Toffee Scottish Tarts,£1.59
-Chilled Food,SPECIALLY SELECTED 'Nduja & Mozzarella Croquettes,£1.99
-Chilled Food,SPECIALLY SELECTED Nacho Cheese Croquettes,£1.99
-Chilled Food,"SPECIALLY SELECTED Chicken, Parmesan & Cheddar Bites",£1.99
 Chilled Food,EAT & GO BBQ Flavoured Protein Chicken Skewers 10 Pack*,£1.59
 Chilled Food,EAT & GO Sweet Chilli Protein Chicken Skewers 10 Pack*,£1.59
 Chilled Food,EAT & GO Peri Peri Protein Chicken Skewers 10 Pack*,£1.59
@@ -1240,9 +1220,6 @@ Chilled Food,ASHFIELD FARM Ready to Eat Flame Grilled Chicken Slices,£2.85
 Chilled Food,ASHFIELD FARM Ready To Eat Sweet Chilli Chicken Slices,£2.85
 Chilled Food,ASHFIELDS BBQ Brisket 10 Slices,£1.79
 Chilled Food,ASHFIELDS British Pastrami 10 Slices,£1.79
-Chilled Food,CRESTWOOD Ready to Eat Mini Chicken Kievs,£1.99
-Chilled Food,CRESTWOOD Ready to Eat Cheese Bites,£1.99
-Chilled Food,CRESTWOOD Ready to Eat Honey & Mustard Cocktail Sausages,£1.99
 Chilled Food,INSPIRED CUISINE Chicken Korma With Pilau Rice,£2.69
 Chilled Food,INSPIRED CUISINE Chicken Rogan Josh With Pilau Rice,£2.69
 Chilled Food,BILASH Chicken Jalfrezi With Pilau Rice,£2.69
@@ -1294,8 +1271,6 @@ Chilled Food,SPECIALLY SELECTED Steak Pie,£2.79
 Chilled Food,"SPECIALLY SELECTED Chicken, Bacon & Leek Pie",£2.79
 Chilled Food,SPECIALLY SELECTED Steak Pie,£4.49
 Chilled Food,"SPECIALLY SELECTED Chicken, Bacon & Leek Pie",£4.49
-Chilled Food,SPECIALLY SELECTED Steak & Ale Pie,£4.49
-Chilled Food,SPECIALLY SELECTED Chicken & Veg Pie,£4.49
 Chilled Food,CUCINA Chicken & Bacon Tortelloni,£1.69
 Chilled Food,CUCINA Spicy Sausage Tortelloni,£1.69
 Chilled Food,SPECIALLY SELECTED Sicilian Queen Nocellara Olives,£2.19
@@ -1320,11 +1295,6 @@ Chilled Food,EMPORIUM British Medium Cheddar Cheese,£2.79
 Chilled Food,PLANT MENU Mature Coconut Oil Based Vegan Cheese Block,£1.95
 Chilled Food,PLANT MENU Mature Coconut Oil Based Vegan Cheese 9 Slices,£1.95
 Chilled Food,PLANT MENU Mature Grated Cocnut Oil Based Vegan Cheese,£1.95
-Chilled Food,CRESTWOOD Cheesy Garlic Pastry,£1.99
-Chilled Food,CRESTWOOD Spicy Sweetcorn Fritter,£1.99
-Chilled Food,CRESTWOOD BBQ Chicken Lattices 7 Pack*,£1.99
-Chilled Food,CRESTWOOD Mediterranean Vegetable Parcels 4 Pack,£1.99
-Chilled Food,"CRESTWOOD 'Nduja, Cheddar & Tomato Parcels 4 Pack",£1.99
 Chilled Food,ASHFIELDS British Wafer Thin Honey Roast Ham Family Pack 28 Slices,£3.49
 Chilled Food,ASHFIELDS British Wafer Thin Cooked Ham Family Pack 28 Slices,£3.49
 Chilled Food,EMPORIUM Classic Grilling Cheese,£0.49
@@ -1427,8 +1397,6 @@ Chilled Food,BROOKLEA Apricot Flavour Thick & Creamy Yogurt,£0.49
 Chilled Food,BROOKLEA Peach & Passionfruit Flavour Thick & Creamy Yogurt,£0.49
 Chilled Food,BROOKLEA Raspberry Flavour Thick & Creamy Yogurt,£0.49
 Chilled Food,BROOKLEA Strawberry Flavour Thick & Creamy Yogurt,£0.49
-Chilled Food,CRESTWOOD Pork Sausage Mini Rolls 20 Pack,£1.59
-Chilled Food,CRESTWOOD Beef & Vegetable Mini Pasties 10 Pack,£1.59
 Chilled Food,CARLOS Protein Meat Feast Pizza,£2.99
 Chilled Food,EAT & GO Chicken & Bacon Protein Poppers 5 Pack,£1.99
 Chilled Food,EAT & GO Garlic & Herb Protein Chicken Poppers 5 Pack,£1.99
@@ -1500,6 +1468,9 @@ Chilled Food,SPECIALLY SELECTED GASTRO Creamy Roasted Mushroom Tortiglioni,£3.4
 Chilled Food,SPECIALLY SELECTED GASTRO Beef Brisket Pappardelle,£3.49
 Chilled Food,BILASH Lamb Samosa's,£0.99
 Chilled Food,BILASH Vegetable Samosa's,£0.99
+Chilled Food,EAT & GO Tikka Curry in a Naan,£1.99
+Chilled Food,EAT & GO Tandoori Curry in a Naan,£1.99
+Chilled Food,HALLOWEEN AAAHMAZING Halloween Mozzarella Sticks,£1.99
 Chilled Food,BROOKLEA Greek Yoghurt 0% Fat,£1.99
 Chilled Food,EVERYDAY ESSENTIALS Low Fat Cottage Cheese,£0.89
 Chilled Food,COWBELLE Fresh British Lighter Crème Fraîche,£0.85
@@ -1551,8 +1522,6 @@ Chilled Food,SPECIALLY SELECTED Tabbouleh,£1.89
 Chilled Food,EAT & GO Chicken & Cranberry Chicken Poppers Grazing Pack,£1.99
 Chilled Food,EAT & GO Fish Snacking Sushi Pack,£1.09
 Chilled Food,EAT & GO Veg Snacking Sushi Pack,£1.09
-Chilled Food,EAT & GO Tikka Curry in a Naan,£1.99
-Chilled Food,EAT & GO Tandoori Curry in a Naan,£1.99
 Chilled Food,Peppered Ham Trimmings,£2.49
 Chilled Food,THE CHEESE EMPORIUM Full Fat Soft Cheese,£0.95
 Chilled Food,ELMLEA Double Elmlea,£1.25
@@ -1588,8 +1557,6 @@ Chilled Food,BRANDED Protein Meatball Pasta,£2.89
 Chilled Food,BRANDED Protein BBQ Pulled Pork & Rice,£2.89
 Chilled Food,BABYBEL Original Mini Babybels 10 Pack,£2.89
 Chilled Food,BABYBEL Light Mini Babybels 10 Pack,£2.89
-Chilled Food,JAKE & NAYN Tandoori Chicken Filled Naan,£1.99
-Chilled Food,JAKE & NAYN Chicken Tikka Filled Naan,£1.99
 Chilled Food,FLAKE BAKE Jamaican Beef Patty,£0.99
 Chilled Food,FLAKE BAKE Jamaican Chicken Patty,£0.99
 Chilled Food,ASIA GREEN GARDEN Chicken Udon Noodles,£2.99
@@ -1623,6 +1590,7 @@ Food Cupboard,THE FISHMONGER Tuna Chunks in Sunflower Oil 4 Pack,£2.49
 Food Cupboard,THE FISHMONGER Tuna Chunks In Sunflower Oil,£0.65
 Food Cupboard,EVERYDAY ESSENTIALS Tuna Chunks In Brine,£0.55
 Food Cupboard,SPECIALLY SELECTED Maple Syrup,£3.99
+Food Cupboard,BELMONT Danish Butter Cookies,£2.99
 Food Cupboard,FOUR SEASONS Supersweet Sweetcorn in Water,£0.63
 Food Cupboard,FOUR SEASONS Sweetcorn in Water 4 Pack,£1.85
 Food Cupboard,CUCINA Chopped Tomatoes in a Rich Tomato Juice,£0.45
@@ -1671,7 +1639,6 @@ Food Cupboard,EVERYDAY ESSENTIALS Garden Peas in Water,£0.28
 Food Cupboard,THE DELI Green Sliced Jalapeños,£0.39
 Food Cupboard,BRAMWELLS Corned Beef,£2.05
 Food Cupboard,DESSERT MENU Evaporated Milk,£0.55
-Food Cupboard,THE FISHMONGER Red Salmon,£2.79
 Food Cupboard,EVERYDAY ESSENTIALS Peeled Potatoes in Water,£0.39
 Food Cupboard,THE DELI Balsamic Vinegar of Modena,£1.69
 Food Cupboard,WORLDWIDE FOODS Long Grain Rice Pouch,£0.49
@@ -1687,7 +1654,6 @@ Food Cupboard,DESSERT MENU Rice Pudding,£0.75
 Food Cupboard,ASIA SPECIALITIES Sweet Chilli Sauce,£1.69
 Food Cupboard,EVERYDAY ESSENTIALS Golden Vegetable Rice,£0.28
 Food Cupboard,FOUR SEASONS Mushy Peas,£0.35
-Food Cupboard,EVERYDAY ESSENTIALS Clear Honey,£0.79
 Food Cupboard,EVERYDAY ESSENTIALS Rice Pudding,£0.29
 Food Cupboard,EVERYDAY ESSENTIALS Spaghetti,£0.28
 Food Cupboard,BILASH Poppadoms,£1.09
@@ -1762,6 +1728,7 @@ Food Cupboard,BELMONT Jammy Wheel Minis 6 Pack,£0.89
 Food Cupboard,THE PANTRY Mini Marshmallows,£1.29
 Food Cupboard,BELMONT Custard Creams,£0.45
 Food Cupboard,DOMINION Mini Gems,£0.89
+Food Cupboard,BELMONT Scottish Shortbread,£4.95
 Food Cupboard,BELMONT Extremely Chocolatey Biscuit Selection,£4.49
 Food Cupboard,BELMONT Shortbread Petticoat Tail,£4.49
 Food Cupboard,CUCINA Tomato Passata,£0.49
@@ -1777,7 +1744,6 @@ Food Cupboard,THE PANTRY Strong White Bread Flour,£1.09
 Food Cupboard,SOLESTA Extra Virgin Olive Oil,£6.19
 Food Cupboard,BRAMWELLS Reduced Salt & Sugar Ketchup,£0.89
 Food Cupboard,DOMINION Flix & Mix,£1.35
-Food Cupboard,DOMINION Fruit Chews,£2.69
 Food Cupboard,THE PANTRY Fast Action Yeast 8 Pack,£0.89
 Food Cupboard,THE PANTRY Cornflour,£1.75
 Food Cupboard,THE PANTRY Golden Syrup,£1.35
@@ -1792,8 +1758,10 @@ Food Cupboard,DAIRYFINE Deeno The Dinosaur Chocolate 10 Pack,£1.99
 Food Cupboard,BELMONT Safari Snacks 7 Pack,£1.05
 Food Cupboard,BELMONT Mini Iced Rings 6 Pack,£0.85
 Food Cupboard,BRAMWELLS Tomato Ketchup,£0.89
+Food Cupboard,SAVOUR BAKES Favourites Cracker Selection,£1.29
 Food Cupboard,BELMONT Mega Cookies & Cream,£0.79
 Food Cupboard,EVERYDAY ESSENTIALS Chocolate Chip Cookies,£0.65
+Food Cupboard,SPECIALLY SELECTED Shortbread Fingers,£1.59
 Food Cupboard,BRAMWELLS Chicken Stock Pots 4 Pack,£0.99
 Food Cupboard,BRAMWELLS Beef Stock Pots 4 Pack,£0.99
 Food Cupboard,BRAMWELLS Vegetable Stock Pots 4 Pack,£0.99
@@ -2069,6 +2037,7 @@ Food Cupboard,THE PANTRY Milk Chocolate Chips,£1.09
 Food Cupboard,SPECIALLY SELECTED Quadruple Chocolate Cookies,£1.79
 Food Cupboard,SPECIALLY SELECTED Chocolate & Salted Caramel Cookies,£1.79
 Food Cupboard,SPECIALLY SELECTED Stem Ginger Cookies,£1.79
+Food Cupboard,SNACKRITE Variety Crisps Multipack,£1.29
 Food Cupboard,SNACKRITE Ready Salted Ridged Lights Crisps 6 Pack,£1.29
 Food Cupboard,SNACKRITE Cheese Flavour Curlers 10 Pack,£1.39
 Food Cupboard,SNACKRITE Cheese Flavour Cheezios 10 Pack,£1.35
@@ -2190,8 +2159,8 @@ Food Cupboard,SAVOUR BAKES Salt & Vinegar Caramel Rice Cakes,£0.79
 Food Cupboard,SAVOUR BAKES Sweet Chilli Caramel Rice Cakes,£0.79
 Food Cupboard,MOSER ROTH Sea Salt Chocolate,£2.29
 Food Cupboard,MOSER ROTH Milk Chocolate,£2.29
-Food Cupboard,HARVEST MORN Peanut Butter Flavour High Protein Bar 3 Pack,£4.19
-Food Cupboard,HARVEST MORN Cookie Dough Flavour High Protein Bar 3 Pack,£4.19
+Food Cupboard,HARVEST MORN Peanut Butter Flavour High Protein Bar 3 Pack,£4.25
+Food Cupboard,HARVEST MORN Cookie Dough Flavour High Protein Bar 3 Pack,£4.25
 Food Cupboard,BRAMWELLS Chunky Vegetable Soup,£0.99
 Food Cupboard,BRAMWELLS Chunky Lamb Soup,£0.99
 Food Cupboard,CHOCEUR Dark Hazelnut Chocolate,£1.09
@@ -2219,10 +2188,8 @@ Food Cupboard,BRAMWELLS Jerk Flavoured Sauce,£0.49
 Food Cupboard,BRAMWELLS Korean BBQ Flavored Sauce,£0.49
 Food Cupboard,THE FOODIE MARKET Dried Cranberries,£1.25
 Food Cupboard,THE FOODIE MARKET Yogurt Coated Cranberries,£1.25
-Food Cupboard,THE FOODIE MARKET Fruit & Nut Mix,£1.25
-Food Cupboard,THE FOODIE MARKET Raisins & Cranberries,£1.25
-Food Cupboard,GRANDESSA Smooth 100% Peanut Butter,£3.99
-Food Cupboard,GRANDESSA Crunchy 100% Peanut Butter,£3.99
+Food Cupboard,THE FOODIE MARKET Fruit & Nut Mix,£1.35
+Food Cupboard,THE FOODIE MARKET Raisins & Cranberries,£1.35
 Food Cupboard,SPECIALLY SELECTED Chilli Infused Olive Oil,£2.39
 Food Cupboard,SPECIALLY SELECTED Basil Infused Olive Oil,£2.39
 Food Cupboard,SPECIALLY SELECTED Garlic Infused Olive Oil,£2.39
@@ -2230,15 +2197,14 @@ Food Cupboard,THE FOODIE MARKET Dried Prunes,£2.79
 Food Cupboard,THE FOODIE MARKET Pitted Dates,£2.79
 Food Cupboard,THE PANTRY Ground Almonds,£1.09
 Food Cupboard,THE PANTRY Flaked Almonds,£1.09
-Food Cupboard,THE PANTRY Walnut Pieces,£1.09
 Food Cupboard,SNACKRITE BBQ Flavour Popouts Crisps 5 Pack,£1.39
 Food Cupboard,SNACKRITE Sour Cream & Onion Flavour Popouts Crisps 5 Pack,£1.39
 Food Cupboard,SPECIALLY SELECTED Rigatoni Pasta Di Gragnano P.G.I.,£1.39
 Food Cupboard,SPECIALLY SELECTED Bucatini Pasta Di Gragnano P.G.I.,£1.39
 Food Cupboard,HARVEST MORN Golden Syrup Flavour Protein Porridge Pot,£0.69
 Food Cupboard,HARVEST MORN Chocolate Protein Porridge Pot,£0.69
-Food Cupboard,HARVEST MORN Honey & Yogurt Breakfast Biscuits 5 Pack,£1.39
-Food Cupboard,HARVEST MORN Strawberry & Yogurt Breakfast Biscuits 5 Pack,£1.39
+Food Cupboard,HARVEST MORN Honey & Yogurt Breakfast Biscuits 5 Pack,£1.49
+Food Cupboard,HARVEST MORN Strawberry & Yogurt Breakfast Biscuits 5 Pack,£1.49
 Food Cupboard,THE FOODIE MARKET Dino Gems 5 Pack,£1.09
 Food Cupboard,THE FOODIE MARKET Dino Tails 5 Pack,£1.09
 Food Cupboard,SNACKRITE Sour Cream & Onion Stackz,£1.35
@@ -2271,17 +2237,8 @@ Food Cupboard,SNACKRITE Sour Cream & Chive Starry Night Mix,£1.29
 Food Cupboard,SNACKRITE Salt & Vinegar Starry Night Mix,£1.29
 Food Cupboard,SNACKRITE Variety Ridged Crisps 6 Pack,£1.19
 Food Cupboard,SNACKRITE Meaty Ridged Crisps 6 Pack,£1.19
-Food Cupboard,MAGGI BBQ Seasoning,£0.59
-Food Cupboard,MAGGI Mexican Seasoning,£0.59
-Food Cupboard,MAGGI Korean Chicken Seasoning,£0.59
-Food Cupboard,MAGGI Chicken Garlic Seasoning,£0.59
-Food Cupboard,MAGGI Butter Chicken Seasoning,£0.59
-Food Cupboard,MAGGI Air Fryer Fajita Seasoning,£0.59
-Food Cupboard,MAGGI Air Fryer Piri Piri Seasoning,£0.59
-Food Cupboard,MAGGI Air Fryer Shawarma Chicken Seasoning,£0.59
-Food Cupboard,MAGGI Pan-Perfect Sweet Teriyaki Seasoning,£0.59
-Food Cupboard,HARVEST MORN Chocolate Protein Granola,£2.35
-Food Cupboard,HARVEST MORN Berry Protein Granola,£2.35
+Food Cupboard,HARVEST MORN Chocolate Protein Granola,£2.39
+Food Cupboard,HARVEST MORN Berry Protein Granola,£2.39
 Food Cupboard,SPECIALLY SELECTED Port Cranberry Sauce,£1.49
 Food Cupboard,SPECIALLY SELECTED Cranberry Sauce,£1.49
 Food Cupboard,BRAMWELLS Cheese Sauce Mix,£0.39
@@ -2294,6 +2251,8 @@ Food Cupboard,DAIRYFINE White Chocolate Fingers,£0.99
 Food Cupboard,THE DELI Pickled Sliced Beetroot,£0.79
 Food Cupboard,THE DELI Pickled Baby Beetroot,£0.79
 Food Cupboard,SPECIALLY SELECTED Peppercorn Pour Over Sauce,£1.79
+Food Cupboard,SPECIALLY SELECTED Vintage Cheddar Pour Over Sauces Mix,£1.79
+Food Cupboard,SPECIALLY SELECTED Hollandaise Pour Over Sauces Mix,£1.79
 Food Cupboard,GRANDESSA Creamy 100% Peanut Butter,£1.49
 Food Cupboard,GRANDESSA Crunchy 100% Peanut Butter,£1.49
 Food Cupboard,DESSERT MENU Lo Cal Strawberry Flavour Jelly Pot,£0.55
@@ -2305,25 +2264,30 @@ Food Cupboard,SNACKRITE BBQ Beef Flavour Potato Hoops 6 Pack,£1.25
 Food Cupboard,SNACKRITE Salt & Vinegar Flavour Potato Hoops 6 Pack,£1.25
 Food Cupboard,HARVEST MORN Rocky Rainbow Bars 5 Pack,£1.49
 Food Cupboard,HARVEST MORN Cocoa Peanut Butter Ball Cereal Bar 5 Pack,£1.49
-Food Cupboard,GREAT BAKING Blue Food Colouring,£0.69
-Food Cupboard,GREAT BAKING Green Food Colouring,£0.69
-Food Cupboard,GREAT BAKING Pink Food Colouring,£0.69
-Food Cupboard,GREAT BAKING Red Food Colouring,£0.69
-Food Cupboard,GREAT BAKING Yellow Food Colouring,£0.69
 Food Cupboard,DOMINION Cola Bottles,£0.79
 Food Cupboard,DOMINION Gummy Mix,£0.79
 Food Cupboard,DOMINION Jelly Cherries,£0.79
 Food Cupboard,DOMINION Teeth & Lips,£0.79
+Food Cupboard,SPECIALLY SELECTED Cheese Crispies,£1.39
+Food Cupboard,SPECIALLY SELECTED Cheese Straws,£1.39
+Food Cupboard,SPECIALLY SELECTED Onion Palmiers,£1.39
+Food Cupboard,SPECIALLY SELECTED All Butter Cinnamon Knots,£1.69
+Food Cupboard,SPECIALLY SELECTED Caramel Sticks,£1.69
 Food Cupboard,GREAT BAKING Party Candles 24 Pack,£0.79
+Food Cupboard,THE FOODIE MARKET Macadamias,£2.99
+Food Cupboard,THE FOODIE MARKET Pecans,£2.99
+Food Cupboard,SPECIALLY SELECTED Beef Wellington Crinkle Crisps,£1.15
 Food Cupboard,"SPECIALLY SELECTED Camembert, Chilli & Honey Crinkle Crisps",£1.15
 Food Cupboard,BELMONT Milk Chocolate Chunky Biscuits 6 Pack,£1.79
 Food Cupboard,BELMONT Orange Chunky Biscuits 6 Pack,£1.79
 Food Cupboard,HARVEST MORN Choco Rice Cereal Bars 6 Pack,£0.99
 Food Cupboard,HARVEST MORN Crisp Rice Cereal Bars 6 Pack,£0.99
 Food Cupboard,HARVEST MORN Cornflakes Cereal Bars 6 Pack,£0.99
-Food Cupboard,HARVEST MORN Salted Chocolate Nut Bars 3 Pack,£1.79
-Food Cupboard,HARVEST MORN Peanut Butter Nut Bars 3 Pack,£1.79
+Food Cupboard,HARVEST MORN Salted Chocolate Nut Bars 3 Pack,£1.85
+Food Cupboard,HARVEST MORN Peanut Butter Nut Bars 3 Pack,£1.85
 Food Cupboard,HARVEST MORN Mixed Berry Flavour Porridge Pot,£0.37
+Food Cupboard,THE FOODIE MARKET Strawberry Slices,£1.99
+Food Cupboard,THE FOODIE MARKET Apple Slices,£1.99
 Food Cupboard,HARVEST MORN S'mores Flavoured Cereal,£1.79
 Food Cupboard,BELMONT Cherry Bakewell Flavour Jaffa Cakes 12 Pack,£0.49
 Food Cupboard,HARVEST MORN Yogurt Coated Rice Cakes,£1.95
@@ -2369,23 +2333,9 @@ Food Cupboard,SPECIALLY SELECTED Blueberry Conserve,£1.89
 Food Cupboard,SPECIALLY SELECTED Apple & Blackcurrant Conserve,£1.89
 Food Cupboard,GRANDESSA Smooth Sweet & Salty Smooth Peanut Butter,£1.29
 Food Cupboard,GRANDESSA Crunchy Sweet & Salty Crunchy Peanut Butter,£1.29
-Food Cupboard,BELMONT Danish Butter Cookies,£2.99
-Food Cupboard,BELMONT Scottish Shortbread,£4.95
-Food Cupboard,BURTON'S Pickled Onion Crisps 6 Pack,£0.99
-Food Cupboard,BURTON'S Salt & Vinegar Crisps 6 Pack,£0.99
 Food Cupboard,GREAT BAKING Spotty Cupcake Cases,£0.99
-Food Cupboard,SAVOUR BAKES Favourites Cracker Selection,£1.29
-Food Cupboard,SPECIALLY SELECTED Shortbread Fingers,£1.59
 Food Cupboard,NATURE'S PICK Toffee Apple,£0.69
 Food Cupboard,NATURE'S PICK Chocolate Sprinkles Apple,£0.69
-Food Cupboard,SPECIALLY SELECTED Vintage Cheddar Pour Over Sauces Mix,£1.79
-Food Cupboard,SPECIALLY SELECTED Hollandaise Pour Over Sauces Mix,£1.79
-Food Cupboard,SPECIALLY SELECTED Cheese Crispies,£1.39
-Food Cupboard,SPECIALLY SELECTED Cheese Straws,£1.39
-Food Cupboard,SPECIALLY SELECTED Onion Palmiers,£1.39
-Food Cupboard,SPECIALLY SELECTED All Butter Cinnamon Knots,£1.69
-Food Cupboard,SPECIALLY SELECTED Caramel Sticks,£1.69
-Food Cupboard,SPECIALLY SELECTED Beef Wellington Crinkle Crisps,£1.15
 Food Cupboard,FOUR SEASONS Sliced Mushrooms,£0.39
 Food Cupboard,FOUR SEASONS Whole Button Mushrooms,£0.39
 Food Cupboard,"READY, SET…COOK! Parsley",£0.65
@@ -2411,6 +2361,7 @@ Food Cupboard,PERFECT CHRISTMAS Ready to Roll Marzipan,£1.99
 Food Cupboard,PERFECT CHRISTMAS Ready to Roll White Icing,£2.35
 Food Cupboard,CADBURY Twirl 5 Pack,£1.65
 Food Cupboard,KINDER Kinder Snack Bar 6 Pack,£1.59
+Food Cupboard,FOX'S Classic Biscuits,£5.29
 Food Cupboard,SMARTIES Smarties Giant Tube,£1.19
 Food Cupboard,CADBURY Heroes Tub,£4.89
 Food Cupboard,NESTLE After Eight,£3.49
@@ -2426,7 +2377,7 @@ Food Cupboard,"READY, SET…COOK! Peri Peri Seasoning",£0.75
 Food Cupboard,"READY, SET…COOK! Bay Leaf",£0.49
 Food Cupboard,"READY, SET…COOK! Sesame Seeds",£0.85
 Food Cupboard,"READY, SET…COOK! All Purpose Seasoning",£0.79
-Food Cupboard,WALKERS Variety Crisps Multipack 12 Pack,£3.05
+Food Cupboard,WALKERS Variety Crisps Multipack 12 Pack,£3.19
 Food Cupboard,"READY, SET…COOK! Chinese 5 Spice",£0.89
 Food Cupboard,"READY, SET…COOK! Paprika",£0.69
 Food Cupboard,"READY, SET…COOK! Smoked Paprika",£0.69
@@ -2487,15 +2438,15 @@ Food Cupboard,WRIGLEY'S Extra White Bubblemint Chewing Gum 3 Pack,£1.39
 Food Cupboard,WRIGLEY'S Extra Cool Breeze Sugarfree Chewing Gum 3 Pack,£1.39
 Food Cupboard,WRIGLEY'S Extra Peppermint Sugarfree Chewing Gum 3 Pack,£1.39
 Food Cupboard,WRIGLEY'S Extra Spearmint Sugarfree Chewing Gum 3 Pack,£1.39
-Food Cupboard,STORCK Werther's Original Butter Candies,£1.19
-Food Cupboard,STORCK Werther's Original Creamy Filling,£1.19
-Food Cupboard,STORCK Werther's Original Butter Candies Sugar Free,£1.19
+Food Cupboard,STORCK Werther's Original Butter Candies,£1.09
+Food Cupboard,STORCK Werther's Original Creamy Filling,£1.09
+Food Cupboard,STORCK Werther's Original Butter Candies Sugar Free,£1.09
 Food Cupboard,HEINZ Tomato Ketchup,£2.85
 Food Cupboard,HEINZ Less Sugar & Salt Tomato Ketchup,£2.85
 Food Cupboard,BRAMWELLS EXPRESS Curry Flavour Noodle Bowl,£0.99
 Food Cupboard,BRAMWELLS EXPRESS Chicken Flavour Noodle Bowl,£0.99
-Food Cupboard,WALKERS Quavers Cheese Flavour Potato Snacks 12 Pack,£3.05
-Food Cupboard,WALKERS Baked Wotsits 12 Pack,£3.05
+Food Cupboard,WALKERS Quavers Cheese Flavour Potato Snacks 12 Pack,£3.19
+Food Cupboard,WALKERS Baked Wotsits 12 Pack,£3.19
 Food Cupboard,SWIZZELS Original Raspberry & Milk Drumstick Squashies,£0.95
 Food Cupboard,SWIZZELS Sour Cherry & Apple Flavour Drumstick Squashies,£0.95
 Food Cupboard,KNOPPERS Milk Wafer Bars 4 Pack,£1.49
@@ -2521,7 +2472,6 @@ Food Cupboard,BRAMWELLS EXPRESS Curry Flavour Instant Noodles,£0.35
 Food Cupboard,BRAMWELLS EXPRESS BBQ Beef Flavour Instant Noodles,£0.35
 Food Cupboard,HEINZ Beanz in a Rich Tomato Sauce 3 Pack,£2.75
 Food Cupboard,HEINZ No Added Sugar Beanz in a Rich Tomato Sauce 3 Pack,£2.75
-Food Cupboard,FOX'S Classic Biscuits,£5.29
 Food Cupboard,PERFECT CHRISTMAS Salted Festive Pretzels,£1.49
 Food Cupboard,PERFECT CHRISTMAS Sour Cream Festive Pretzels,£1.49
 Food Cupboard,HALLOWEEN AAAHMAZING Mallow Lolly,£0.95
@@ -2532,7 +2482,7 @@ Drinks,THE JUICE COMPANY Smooth Orange Juice,£1.15
 Drinks,THE JUICE COMPANY Apple Juice,£1.09
 Drinks,AQUA VALE Still Spring Water 12 Pack,£1.75
 Drinks,EVERYDAY ESSENTIALS Diet Lemonade,£0.39
-Drinks,ALCAFÉ Rich Roast Instant Coffee Granules,£1.99
+Drinks,ALCAFÉ Rich Roast Instant Coffee Granules,£2.09
 Drinks,ALCAFÉ Decaff Gold Roast Freeze Dried Coffee,£1.25
 Drinks,AQUA VALE Sparkling Water 6 Pack,£1.19
 Drinks,DIPLOMAT Red Label Tea Bags 160 Pack,£1.85
@@ -2654,9 +2604,6 @@ Drinks,SUN QUENCH Fruity Blasts Apple & Blackcurrant Juice Drink 8 Pack,£1.79
 Drinks,SUN QUENCH Fruity Blasts Summer Fruits Juice Drink 8 Pack,£1.79
 Drinks,SPECIALLY SELECTED Colombian Instant Coffee,£2.59
 Drinks,SPECIALLY SELECTED Costa Rican Instant Coffee,£2.59
-Drinks,DAIRYFINE Racer Instant Hot Chocolate 8 Pack,£0.99
-Drinks,DAIRYFINE Romeo Instant Hot Chocolate 8 Pack,£0.99
-Drinks,DAIRYFINE Jive Instant Hot Chocolate 8 Pack,£0.99
 Drinks,DAIRYFINE Light Mint Hot Chocolate,£1.99
 Drinks,THE JUICE COMPANY Apple & Mango Juice,£1.75
 Drinks,THE JUICE COMPANY 100% Pressed Orange & Mango Juice,£1.75
@@ -2679,6 +2626,8 @@ Drinks,AQUEO Still Spring Water,£0.45
 Drinks,GALAXY Frothy Instant Hot Chocolate,£2.75
 Drinks,COCA-COLA Coca-Cola Original Taste,£2.55
 Drinks,TAYLORS OF HARROGATE Yorkshire Tea Bags 210 Pack,£5.49
+Drinks,NESCAFÉ Alta Rica 100% Arabica Instant Coffee,£2.99
+Drinks,TETLEY Original One Cup 440 Pack,£6.49
 Drinks,COCA-COLA Coca-Cola Classic 8 Pack,£5.59
 Drinks,COCA-COLA Diet Coke,£1.79
 Drinks,PEPSI MAX Pepsi Max,£1.59
@@ -2720,7 +2669,7 @@ Alcohol,ORCHARD PREMIUM Irish Cider Original Recipe,£1.25
 Alcohol,GALAHAD Premium Lager 4 Pack,£2.99
 Alcohol,OLD HOPKING Dark Rum,£11.99
 Alcohol,SPECIALLY SELECTED Vintage Cider,£2.49
-Alcohol,STEFANOFF Vodka,£16.29
+Alcohol,STEFANOFF Triple Distilled Vodka,£16.29
 Alcohol,GREYSON'S London Dry Gin,£16.29
 Alcohol,SPECIALLY SELECTED Haysmiths London Dry Gin,£16.99
 Alcohol,RHEINBACHER Pilsner 4 Pack,£3.99
@@ -2734,7 +2683,6 @@ Alcohol,COSTELLORE Prosecco Frizzante DOC,£5.49
 Alcohol,COSTELLORE Chianti,£5.69
 Alcohol,KOOLIBURRA Jammy Red,£5.79
 Alcohol,SPECIALLY SELECTED White Blend Wine,£10.99
-Alcohol,SPECIALLY SELECTED Toscana Rosso,£7.25
 Alcohol,COCOBAY Cocobay,£6.99
 Alcohol,BEACHFRONT Californian Merlot,£4.99
 Alcohol,TAURUS Cherry Cider 4 Pack,£2.99
@@ -2762,7 +2710,6 @@ Alcohol,KOOLIBURRA Shiraz,£4.15
 Alcohol,KOOLIBURRA Australian Shiraz Cabernet,£4.79
 Alcohol,KOOLIBURRA Australian Sauvignon Semillon,£4.39
 Alcohol,SPECIALLY SELECTED Cremant du Jura,£10.99
-Alcohol,BEACHFRONT Californian Chardonnay,£8.99
 Alcohol,GRAPEVINE Toro Loco Organic,£4.35
 Alcohol,CAMBALALA South African Sauvignon Blanc,£5.99
 Alcohol,RHEINBACHER Pilsner 0% Alcohol Free 6 Pack,£3.29
@@ -2771,7 +2718,6 @@ Alcohol,STEFANOFF Superior Vodka Triple Distilled,£6.79
 Alcohol,ESTEVEZ Chilean Chardonnay,£4.49
 Alcohol,ESTEVEZ Sauvignon Blanc,£4.49
 Alcohol,ESTEVEZ Chilean Merlot,£4.15
-Alcohol,ESTEVEZ Malbec,£5.49
 Alcohol,ESTEVEZ Chilean Cabernet Sauvignon,£4.49
 Alcohol,CAMBALALA South African Sauvignon Blanc,£4.99
 Alcohol,SPECIALLY SELECTED Glühwein,£5.99
@@ -2791,7 +2737,6 @@ Alcohol,COSTELLORE Trebbiano Pinot Grigio,£13.99
 Alcohol,COSTELLORE Italian Blush Rosé,£13.99
 Alcohol,COSTELLORE It's Still Prosecco,£4.49
 Alcohol,SPECIALLY SELECTED Baron Amarillo Rioja Blanco,£6.99
-Alcohol,SPECIALLY SELECTED Premium Pinot Grigio d Ven DOC,£5.99
 Alcohol,KOOLIBURRA Jammy Shiraz,£10.99
 Alcohol,ESTEVEZ Merlot,£3.99
 Alcohol,SPECIALLY SELECTED Regional Shiraz,£7.79
@@ -2839,31 +2784,30 @@ Alcohol,SAMUEL JOE'S Straight Kentucky Bourbon,£14.99
 Alcohol,SMIRNOFF Vodka,£13.99
 Alcohol,HIGHLAND BLACK Distiller's Reserve Blended Scotch Whisky,£15.49
 Alcohol,NEWCASTLE BROWN Newcastle Brown Ale,£1.69
-Alcohol,GUINNESS Guinness Draught Stout,£5.75
+Alcohol,GUINNESS Guinness Draught Stout,£5.69
 Alcohol,HIGHLAND EARL The Special Reserve Blended Scotch Whisky,£17.49
 Alcohol,GREENE KING Abbot Ale 4 Pack,£5.89
 Alcohol,NAPOLEON Rare Old Brandy,£11.99
 Alcohol,BRASSERIE French Lager 10 Pack,£3.79
 Alcohol,BUDWEISER Budweiser 20 Pack,£16.99
-Alcohol,CORONA Corona 18 Pack,£17.99
+Alcohol,CORONA Corona 18 Pack,£14.99
 Alcohol,ST AUSTELL Proper Job Cornish IPA,£1.99
 Alcohol,MCEWAN'S Champion Premium Ale,£1.95
 Alcohol,SAN MIGUEL Premium Lager 12 Pack,£11.95
 Alcohol,STRONGBOW Original Cider 18 Pack,£13.99
 Alcohol,SAINTE ETIENNE Alcohol Free Lager,£0.99
-Alcohol,CARLING Original Lager 18 Pack,£14.99
+Alcohol,CARLING Original Lager 18 Pack,£11.99
 Alcohol,STELLA ARTOIS Premium Lager 4 Pack,£6.19
 Alcohol,AUSTIN'S Classic Summer Punch,£6.99
 Alcohol,BIRRA MAPELLI Italia Premium Lager,£1.49
 Alcohol,BALLYCASTLE White Chocolate Flavour Country Cream,£7.29
-Alcohol,STELLA ARTOIS Belgium Premium Lager Beer 18 Pack,£13.95
+Alcohol,STELLA ARTOIS Belgium Premium Lager Beer 18 Pack,£16.95
 Alcohol,SAINTE ETIENNE Premium Lager Beer 4 Pack,£3.49
 Alcohol,SAN MIGUEL San Miguel Especial 4 Pack,£6.75
 Alcohol,BIRRA MORETTI Birra Morretti,£2.15
 Alcohol,CORONA Corona Extra 10 Pack,£10.49
 Alcohol,HIGHLAND EARL The Special Reserve Blended Scotch Whisky,£12.49
 Alcohol,GROVE MANOR Perry White Wine,£6.69
-Alcohol,TORO LOCO Tempranillo Bobal,£5.29
 Alcohol,FLETCHER'S Ruby Port,£8.29
 Alcohol,VEUVE MONSIGNY Champagne Brut,£15.49
 Alcohol,NICOLAS DE MONTBART Champagne Brut,£13.99
@@ -2877,9 +2821,8 @@ Alcohol,ROSSINI Rossini Lager,£1.49
 Alcohol,SHEPHERD NEAME Bishops Finger Kentish Strong Ale,£1.75
 Alcohol,Moscato Spumante Asti DOCG,£4.69
 Alcohol,OLD SPECKLED HEN Distinctive English Pale Ale 4 Pack,£5.69
-Alcohol,FOSTER'S Lager 18 Pack,£11.95
+Alcohol,FOSTER'S Lager 18 Pack,£14.95
 Alcohol,BELLUCCI Luxury Amaretto,£6.39
-Alcohol,HOBGOBLIN Ruby Beer 4 Pack,£4.19
 Alcohol,STELLA ARTOIS Belgium Premium Lager Beer 10 Pack,£9.95
 Alcohol,BUENAS VIDES Malbec,£4.79
 Alcohol,BUENAS VIDES Argentinian Uco Valley Malbec,£6.29
@@ -2937,6 +2880,7 @@ Alcohol,SAN MIGUEL San Miguel Especial Premium Lager 10 Pack,£11.49
 Alcohol,CASSARIO Barbados Golden Rum,£14.99
 Alcohol,FLETCHER'S Ruby Reserve Port,£9.99
 Alcohol,HARPER'S Harpers Pale Ale 4 Pack,£4.49
+Alcohol,STAROPRAMEN Staropramen 10 Pack,£10.99
 Alcohol,ÄLSKA Strawberry & Lime 0% Cider,£0.99
 Alcohol,ÄLSKA Nordic Berries 0% Cider,£0.99
 Alcohol,OSCARS Peach Schnapps,£7.49
@@ -3012,11 +2956,9 @@ Frozen Food,CARLOS Garlic Bread Slices 10 Pack,£1.05
 Frozen Food,GIANNI'S Ice Cubes,£1.09
 Frozen Food,EVERYDAY ESSENTIALS Fish Fingers 10 Pack,£0.80
 Frozen Food,OAKHURST French Fries 2 Pack,£0.79
-Frozen Food,FOUR SEASONS Mini Hash Brown Waffles,£0.49
 Frozen Food,FOUR SEASONS Waffle Fries,£1.69
 Frozen Food,FOUR SEASONS Golden Yorkshire Puddings,£0.99
 Frozen Food,ROOSTERS Chicken Quarter Pounders 2 Pack,£1.69
-Frozen Food,EVERYDAY ESSENTIALS White Fish Fillets,£2.35
 Frozen Food,SPECIALLY SELECTED Beef Dripping Roast Potatoes,£2.89
 Frozen Food,ROOSTERS Chicken Dinosaurs 7 Pack*,£1.99
 Frozen Food,GIANNI'S Vanilla Ice Cream Cones 6 Pack,£2.19
@@ -3025,6 +2967,7 @@ Frozen Food,CARLOS Thin Crust Stonebaked BBQ Meat Feast Pizza,£1.29
 Frozen Food,THE FISHMONGER Salmon Portions 4 Pack,£6.99
 Frozen Food,GIANNI'S Whirlz,£2.29
 Frozen Food,THE FISHMONGER Basa Fillet,£4.49
+Frozen Food,EVERYDAY ESSENTIALS White Fish Fillets 1kg,£4.49
 Frozen Food,SPECIALLY SELECTED Coldwater Prawns,£3.99
 Frozen Food,GIANNI'S Vanilla Wafers Ice Cream Sandwiches 8 Pack,£1.99
 Frozen Food,GIANNI'S Neapolitan Wafers Ice Cream Sandwiches 8 Pack,£1.99
@@ -3172,8 +3115,8 @@ Frozen Food,CARLOS Deep Pan Three Cheese Pizza,£1.35
 Frozen Food,CARLOS Deep Pan Pepperoni Pizza,£1.35
 Frozen Food,EVERYDAY ESSENTIALS Pepperoni  Pizza,£1.10
 Frozen Food,EVERYDAY ESSENTIALS Cheese & Tomato Pizza,£1.10
-Frozen Food,SPECIALLY SELECTED Garlic & Herb Argentinian Prawns,£4.29
-Frozen Food,SPECIALLY SELECTED Raw Peeled Argentinian Prawns,£4.29
+Frozen Food,SPECIALLY SELECTED Garlic & Herb Argentinian Prawns,£3.99
+Frozen Food,SPECIALLY SELECTED Raw Peeled Argentinian Prawns,£3.99
 Frozen Food,SPECIALLY SELECTED Lemon & Prosecco Lobster Tails,£12.99
 Frozen Food,SPECIALLY SELECTED Garlic & Herb Lobster Tails,£12.99
 Frozen Food,PLANT MENU No Chicken Kiev 2 Pack,£1.99
@@ -3186,12 +3129,11 @@ Frozen Food,CARLOS Takeaway Meat Feast Classic Crust Pizza,£2.39
 Frozen Food,CARLOS Takeway BBQ Chicken & Bacon Classic Crust Pizza,£2.39
 Frozen Food,OAKHURST Chicken Strips 4 Pack with BBQ Dip,£2.49
 Frozen Food,OAKHURST Chicken Strips 4 Pack with Sweet Chilli Dip,£2.49
-Frozen Food,EVERYDAY ESSENTIALS Omega 3 Breaded Fish Fillets,£2.50
-Frozen Food,EVERYDAY ESSENTIALS Omega 3 Battered Fish Fillets,£2.50
 Frozen Food,CRESTWOOD Bacon & Cheese Wraps 2 Pack,£1.65
 Frozen Food,CRESTWOOD All Day Breakfast Wraps 2 Pack,£1.65
 Frozen Food,FOUR SEASONS Garlic & Herb Parmentier Potatoes with Salted Parsley Butter,£1.89
 Frozen Food,FOUR SEASONS Salt & Pepper Parmentier Potatoes Coated in Butter with Salt & Crushed Black Pepper,£1.89
+Frozen Food,FOUR SEASONS Rosemary & Sea Salt Ziggy Fries,£1.99
 Frozen Food,EVERYDAY ESSENTIALS Cheese & Tomato Pasta Bake,£0.99
 Frozen Food,EVERYDAY ESSENTIALS Chicken Curry with Rice,£0.99
 Frozen Food,EVERYDAY ESSENTIALS Spaghetti Bolognese,£0.99
@@ -3250,9 +3192,6 @@ Frozen Food,INSPIRED CUISINE Salt & Chilli Pepper Munch Box,£3.99
 Frozen Food,INSPIRED CUISINE Southern Style Munch Box,£3.99
 Frozen Food,INSPIRED CUISINE Peri Peri Munch Box,£3.99
 Frozen Food,INSPIRED CUISINE Curry Sauce Munch Box,£3.99
-Frozen Food,GIANNI'S Squidgeys Ice Cream Lollies 6 Pack,£0.59
-Frozen Food,GIANNI'S Bubblegum Ice Cream Lollies 6 Pack,£0.59
-Frozen Food,GIANNI'S Bananas & Shrimps Ice Cream Lollies 6 Pack,£0.59
 Frozen Food,"CRESTWOOD Sausage, Bean & Cheese Bakes 2 Pack",£1.39
 Frozen Food,CRESTWOOD Cheese & Onion Bakes 2 Pack,£1.39
 Frozen Food,CRESTWOOD Katsu Bakes 2 Pack,£1.39
@@ -3322,8 +3261,8 @@ Frozen Food,ROOSTERS BBQ Chicken Shakerz,£1.99
 Frozen Food,ROOSTERS Paprika Chicken Shakerz,£1.99
 Frozen Food,THE FISHMONGER Breaded Chunky Fish Fingers,£2.69
 Frozen Food,THE FISHMONGER Battered Chunky Fish Fingers,£2.69
-Frozen Food,SPECIALLY SELECTED Crisp & Golden Extra Large Sourdough Breaded Cod Fillets 2 Pack,£4.79
-Frozen Food,SPECIALLY SELECTED Crisp & Golden Extra Large Sourdough Breaded Haddock Fillets 2 Pack,£4.79
+Frozen Food,SPECIALLY SELECTED Crisp & Golden Extra Large Sourdough Breaded Cod Fillets 2 Pack,£4.99
+Frozen Food,SPECIALLY SELECTED Crisp & Golden Extra Large Sourdough Breaded Haddock Fillets 2 Pack,£4.99
 Frozen Food,SPECIALLY SELECTED No Beef Flank Steak 2 Pack,£7.49
 Frozen Food,GIANNI'S Madagascan Vanilla Ice Cream,£2.45
 Frozen Food,GIANNI'S Salted Caramel Ice Cream,£2.45
@@ -3344,7 +3283,6 @@ Frozen Food,QUORN Mince,£2.95
 Frozen Food,QUORN Chicken Pieces,£2.95
 Frozen Food,CHICAGO TOWN Fully Loaded Deep Dish Four Cheese Pizzas 2 Pack,£1.39
 Frozen Food,CHICAGO TOWN Fully Loaded Deep Dish Pepperoni Pizzas 2 Pack,£1.39
-Frozen Food,HASBRO Peppa Ice Cream Lollies 6 Pack,£0.09
 Frozen Food,SLIM WELL Chicken Tikka Masala,£2.69
 Frozen Food,SLIM WELL Three Bean Chilli,£2.69
 Frozen Food,SLIM WELL Korean Style Chicken Noodles,£2.69
@@ -3420,7 +3358,6 @@ Vegetarian Plant Based,QUORN Cocktail Sausages 20 Pack*,£1.99
 Vegetarian Plant Based,QUORN Picnic Eggs 10 Pack*,£1.99
 Baby Toddler,MAMIA Organic Strawberries & Apples Pouch,£0.65
 Baby Toddler,MAMIA Stage 1 First Infant Milk,£6.99
-Baby Toddler,MAMIA Head to Toe Wipes,£0.95
 Baby Toddler,MAMIA Nappy Sacks,£0.79
 Baby Toddler,MAMIA Night Pants,£4.59
 Baby Toddler,MAMIA Nappies Size 1,£0.75
@@ -3440,6 +3377,9 @@ Baby Toddler,MAMIA Nappies Size 6 Jumbo,£4.99
 Baby Toddler,MAMIA Nappies Size 6+,£5.39
 Baby Toddler,MAMIA Nappies Size 4 Jumbo,£4.99
 Baby Toddler,MAMIA Baby Pants Size 4,£3.39
+Baby Toddler,MAMIA Extra Sensitive Baby Wipes,£0.59
+Baby Toddler,MAMIA Baby Wipes Sensitive 6 Pack,£4.15
+Baby Toddler,MAMIA Sensitive Baby Wipes,£0.75
 Baby Toddler,MAMIA Organic Carrot Puffs,£0.55
 Baby Toddler,MAMIA Organic Tomato Wheels,£0.55
 Baby Toddler,MAMIA Organic Mini Apple Rice Cakes,£0.75
@@ -3494,7 +3434,6 @@ Pet Care,LANGHAM'S Natural Dog Treats,£1.99
 Pet Care,EARLS Complete Dog Dry Food,£2.85
 Pet Care,EARLS Worker Dog Complete Dog Food,£8.99
 Pet Care,EARLS Moist & Meaty Complete Dog Food,£4.99
-Pet Care,VITACAT Cat Food Can,£0.69
 Pet Care,VITACAT Healthy Balance Cat Food,£2.69
 Pet Care,VITACAT Tasty Sticks Cat Treats,£1.09
 Pet Care,EARLS Tender Pâté Dog Food Tray,£0.49
