@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+
+# Scraper output written into the scrapers/ dir at runtime.
+# Published copies live in app/public/ and are committed from there.
+/scrapers/aldi.csv
+/scrapers/asda.csv
+/scrapers/morrisons.csv
+/scrapers/tesco.csv
+
+# Node
+node_modules/
+
+# Stray scraper CSVs occasionally dumped at the repo root
+/asda.csv
+/products.csv

@@ -11,11 +11,13 @@ export default function SelectSupermarketPage() {
   const navigate = useNavigate()
 
   const supermarkets = [
-    "Aldi",
-    "Asda",
-    "Morrisons",
-    "Sainsbury's",
-    "Tesco",
+    { name: "Aldi" },
+    { name: "Asda" },
+    { name: "Morrisons" },
+    // Sainsbury's prices are no longer refreshed by the scrapers, so keep it
+    // visible but unselectable rather than serving stale data.
+    { name: "Sainsbury's", disabled: true },
+    { name: "Tesco" },
   ]
 
   const handleContinue = () => {
@@ -65,8 +67,13 @@ export default function SelectSupermarketPage() {
               >
                 <option value="">Choose your supermarket...</option>
                 {supermarkets.map((market) => (
-                  <option key={market} value={market}>
-                    {market}
+                  <option
+                    key={market.name}
+                    value={market.name}
+                    disabled={market.disabled}
+                  >
+                    {market.name}
+                    {market.disabled ? " (unavailable)" : ""}
                   </option>
                 ))}
               </select>

@@ -1,0 +1,116 @@
+name: Supermarket Price Scrapers
+
+# Runs twice a week (Monday & Thursday, 04:00 UTC), scrapes every store with the
+# 2026 scrapers, and publishes each store's CSV to app/public/ only if its row
+# count is within 10% of last week's file (see scrapers/apply_update.py).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * 1,4'  # 04:00 UTC every Monday and Thursday
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r scrapers/requirements.txt
+          # Chromium + its OS libraries for the Playwright-based scrapers.
+          python -m playwright install --with-deps chromium
+
+      # Each scraper writes <store>.csv into the scrapers/ directory. They run
+      # independently: continue-on-error so one blocked/failed store never stops
+      # the others, and the 10% guard decides afterwards what actually ships.
+      - name: Scrape ASDA
+        continue-on-error: true
+        working-directory: scrapers
+        run: python asda.py
+
+      - name: Scrape Tesco
+        continue-on-error: true
+        working-directory: scrapers
+        run: python tesco.py
+
+      - name: Scrape ALDI
+        continue-on-error: true
+        working-directory: scrapers
+        run: python aldi.py
+
+      - name: Scrape Morrisons
+        continue-on-error: true
+        working-directory: scrapers
+        run: python morrisons.py
+
+      - name: Apply 10% row-count guard and stage updated CSVs
+        run: python scrapers/apply_update.py
+
+      - name: Commit and push updated CSVs
+        id: commit
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add app/public/aldi.csv app/public/asda.csv \
+                  app/public/morrisons.csv app/public/tesco.csv
+
+          if git diff --staged --quiet; then
+            echo "No CSVs passed the guard with changes — nothing to commit."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "🛒 Price update - $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push origin HEAD:${{ github.ref_name }}
+            echo "Pushed updated prices to ${{ github.ref_name }}."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The live site is served by GitHub Pages from the gh-pages branch, which
+      # holds the *built* app (with the CSVs copied into the build root). Pushing
+      # to the source branch above is not enough — we must rebuild and redeploy
+      # so the fresh prices actually reach www.comparegroceryprices.uk.
+      # Only runs when at least one store's prices actually changed.
+      - name: Set up Node.js
+        if: steps.commit.outputs.changed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+
+      - name: Build and deploy site to GitHub Pages
+        if: steps.commit.outputs.changed == 'true'
+        working-directory: app
+        env:
+          CI: 'false'  # CRA treats warnings as errors under CI; don't fail the build on them
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          npm ci
+          npm run build                       # copies app/public/*.csv into build/
+          npx gh-pages -d build -b gh-pages \
+            -u "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+          echo "Deployed updated site to gh-pages."
+
+      - name: Upload scraped CSVs as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraped-csvs
+          path: scrapers/*.csv
+          if-no-files-found: ignore
+          retention-days: 7
