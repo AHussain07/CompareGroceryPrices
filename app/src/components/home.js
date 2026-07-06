@@ -20,10 +20,10 @@ export default function HomePage() {
               <span className="logo-text">CompareGroceryPrices</span>
             </Link>
             <nav className="header-nav">
-              <Link to="/contact" className="contact-button">
+              <a href="mailto:comparegrocerypricesuk@gmail.com" className="contact-button">
                 <MessageCircle className="contact-icon" />
                 Contact Us
-              </Link>
+              </a>
             </nav>
           </div>
         </div>
@@ -187,7 +187,7 @@ export default function HomePage() {
             <div className="footer-links">
               <Link to="/privacy" className="footer-link">Privacy Policy</Link>
               <Link to="/terms" className="footer-link">Terms of Service</Link>
-              <Link to="/contact" className="footer-link">Contact Us</Link>
+              <a href="mailto:comparegrocerypricesuk@gmail.com" className="footer-link">Contact Us</a>
             </div>
           </div>
           <div className="footer-bottom">

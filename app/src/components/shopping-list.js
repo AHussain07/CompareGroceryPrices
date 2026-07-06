@@ -667,12 +667,12 @@ export default function ShoppingListPage() {
               <p className="missing-product-description">
                 If you can't find a specific product or brand in our database, let us know and we'll add it for future comparisons.
               </p>
-              <Link 
-                to="/contact?category=missing-item" 
+              <a
+                href="mailto:comparegrocerypricesuk@gmail.com?subject=Missing%20Product%20Report"
                 className="report-missing-link"
               >
                 Report Missing Item
-              </Link>
+              </a>
             </div>
 
             <div className="action-buttons">
