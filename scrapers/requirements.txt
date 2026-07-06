@@ -1,0 +1,9 @@
+# Dependencies for the 2026 supermarket scrapers.
+#   aldi.py / morrisons.py -> Playwright (headless Chromium)
+#   tesco.py               -> BeautifulSoup + curl_cffi (Chrome TLS impersonation)
+#   asda.py                -> Python stdlib only (Algolia HTTP/JSON)
+#
+# After installing, also run:  playwright install --with-deps chromium
+beautifulsoup4==4.12.3
+playwright==1.48.0
+curl_cffi==0.7.3

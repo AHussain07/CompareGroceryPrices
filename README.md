@@ -35,9 +35,12 @@ A modern web application that helps users compare grocery prices across major UK
 
 To ensure up-to-date and accurate supermarket prices, this project uses automated webscraping scripts for each supported supermarket.
 
-- **Scripts Location**: `WebScrape/` directory (e.g., `asda.py`, `tesco.py`, etc.)
-- **Automation**: GitHub Actions workflows in `.github/workflows/` (e.g., `asda-scraper.yml`) schedule and run the scrapers.
-- **Dependencies**: Listed in `WebScrape/requirements.txt`.
+- **Scripts Location**: `scrapers/` directory (`asda.py`, `tesco.py`, `aldi.py`, `morrisons.py`). Each writes `<store>.csv`.
+- **Automation**: A single GitHub Actions workflow, `.github/workflows/scrapers.yml`, runs twice a week (Monday & Thursday) to scrape every store.
+- **Safety guard**: `scrapers/apply_update.py` only publishes a store's new CSV to `app/public/` if its row count is within 10% of the previous week's — a broken or partial scrape is discarded rather than shipped.
+- **Dependencies**: Listed in `scrapers/requirements.txt` (Playwright for ALDI/Morrisons, curl_cffi + BeautifulSoup for Tesco; ASDA uses the stdlib only).
+
+> Note: Sainsbury's has no 2026 scraper yet, so `app/public/sainsburys.csv` is not refreshed by this workflow.
 
 
 ## 📋 How It Works
