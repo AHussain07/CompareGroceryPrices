@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { ShoppingCart, ArrowRight, ArrowLeft, Plus, X, AlertTriangle } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
+import { parseSize, formatUnitPrice } from "../utils/productSize"
 
 // CSV Parser functions
 const parseCSV = (csvText) => {
@@ -207,7 +208,24 @@ const searchProducts = (products, searchTerm, maxResults = 8) => {
           });
         }
       });
-      
+
+      // Multi-word queries: reward matching each word in any order, so
+      // "skimmed milk semi" still finds "Semi Skimmed Milk".
+      const tokens = searchValue.split(/\s+/).filter(t => t.length >= 2);
+      if (tokens.length > 1) {
+        let matched = 0;
+        tokens.forEach(tok => {
+          if (name.includes(tok)) {
+            matched++;
+            score += 40;
+            if (name.startsWith(tok) || name.includes(' ' + tok)) score += 20; // whole word
+          } else if (category.includes(tok)) {
+            score += 10;
+          }
+        });
+        if (matched === tokens.length) score += 150; // every search word present
+      }
+
       return { ...product, relevanceScore: score };
     })
     .filter(product => product.relevanceScore > 0)
@@ -216,18 +234,29 @@ const searchProducts = (products, searchTerm, maxResults = 8) => {
       if (b.relevanceScore !== a.relevanceScore) {
         return b.relevanceScore - a.relevanceScore;
       }
-      
+
       // Then by name length (shorter names first for same relevance)
       if (a.name.length !== b.name.length) {
         return a.name.length - b.name.length;
       }
-      
+
       // Finally alphabetically
       return a.name.localeCompare(b.name);
-    })
-    .slice(0, maxResults);
-  
-  return scoredProducts;
+    });
+
+  // De-duplicate identical product names (the same item can appear more than
+  // once) so the dropdown shows a variety of products rather than repeats.
+  const seen = new Set();
+  const deduped = [];
+  for (const product of scoredProducts) {
+    const key = product.name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(product);
+    if (deduped.length >= maxResults) break;
+  }
+
+  return deduped;
 };
 
 export default function ShoppingListPage() {
@@ -383,16 +412,25 @@ export default function ShoppingListPage() {
     const formattedName = capitalizeFirstLetter(suggestion.name)
     const formattedCategory = suggestion.category ? capitalizeFirstLetter(suggestion.category) : ''
 
+    // Show the pack size and per-unit price so users can compare like-for-like.
+    const size = parseSize(suggestion.name)
+    const numericPrice = parseFloat(cleanPrice.replace(/[£$]/g, ''))
+    const perUnit = size && !isNaN(numericPrice) ? formatUnitPrice(numericPrice, size) : null
+
     return (
       <div className="suggestion-content">
         <div className="suggestion-text">
           <div className="suggestion-main">
             <span className="suggestion-name">{formattedName}</span>
+            {size && <span className="suggestion-size">{size.display}</span>}
             {formattedCategory && (
               <span className="suggestion-brand">{formattedCategory}</span>
             )}
           </div>
-          <span className="suggestion-price">{cleanPrice}</span>
+          <div className="suggestion-price-block">
+            <span className="suggestion-price">{cleanPrice}</span>
+            {perUnit && <span className="suggestion-unit-price">{perUnit}</span>}
+          </div>
         </div>
       </div>
     )

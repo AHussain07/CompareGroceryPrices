@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { ShoppingCart, ArrowLeft, TrendingDown, Store, Search} from 'lucide-react'
 import { Link, useNavigate } from "react-router-dom"
+import { parseSize, sizesComparable, formatUnitPrice } from "../utils/productSize"
 
 // Enhanced Product Matcher Class
 class ProductMatcher {
@@ -180,6 +181,7 @@ class ProductMatcher {
       normalizedName: this.normalizeProductName(name),
       keywords: this.extractKeywords(name),
       price: this.extractPrice(price),
+      size: parseSize(name),
       store,
       category: category || ''
     }
@@ -409,8 +411,81 @@ class ProductMatcher {
         byStore[product.store] = product
       }
     })
-    
+
     return Object.values(byStore).slice(0, 4)
+  }
+
+  // How well two sizes line up, used to rank alternatives so we prefer a
+  // like-for-like match. 1 = same/unknown, low = wrong unit family.
+  sizeAffinity(baseSize, otherSize) {
+    if (!baseSize || !otherSize) return 1 // unknown size: stay neutral
+    if (baseSize.family !== otherSize.family) return 0.25 // e.g. a drink vs a snack
+    const ratio =
+      Math.min(baseSize.magnitude, otherSize.magnitude) /
+      Math.max(baseSize.magnitude, otherSize.magnitude)
+    return 0.7 + 0.3 * ratio // same family: closer sizes rank higher
+  }
+
+  // Build a single store-vs-store comparison that accounts for pack size.
+  // `base` and `alt` are { name, price, store, similarity, size }.
+  // Savings are computed on the SAME quantity so a bigger pack can't look
+  // "cheaper" just because it costs less per unit was ignored.
+  buildComparison(base, alt, searchTerm) {
+    const baseSize = base.size || parseSize(base.name)
+    const altSize = alt.size || parseSize(alt.name)
+    const comparable = sizesComparable(baseSize, altSize)
+    const crossFamily = !!(baseSize && altSize && baseSize.family !== altSize.family)
+
+    let potentialSaving
+    let cheaperStore
+    let altComparablePrice = null
+
+    if (comparable) {
+      const baseUnit = base.price / baseSize.magnitude
+      const altUnit = alt.price / altSize.magnitude
+      // What the alt store would charge for the base product's size.
+      altComparablePrice = altUnit * baseSize.magnitude
+      potentialSaving = Math.max(0, base.price - altComparablePrice)
+      cheaperStore = baseUnit <= altUnit ? base.store : alt.store
+    } else if (crossFamily) {
+      // Not a like-for-like item; don't assert any saving.
+      potentialSaving = 0
+      cheaperStore = null
+    } else {
+      // Size unknown for at least one side: best-effort raw comparison.
+      potentialSaving = Math.max(0, base.price - alt.price)
+      cheaperStore = base.price <= alt.price ? base.store : alt.store
+    }
+
+    return {
+      product1: {
+        name: base.name,
+        price: base.price,
+        store: base.store,
+        similarity: base.similarity,
+        size: baseSize ? baseSize.display : null,
+        unitPrice: formatUnitPrice(base.price, baseSize),
+      },
+      product2: {
+        name: alt.name,
+        price: alt.price,
+        store: alt.store,
+        similarity: alt.similarity,
+        size: altSize ? altSize.display : null,
+        unitPrice: formatUnitPrice(alt.price, altSize),
+        comparablePrice: altComparablePrice, // alt price at the base's size
+      },
+      priceDifference: Math.abs(base.price - alt.price),
+      potentialSaving,
+      combinedSimilarity: (base.similarity + alt.similarity) / 2,
+      cheaperStore,
+      cheaperPrice: comparable
+        ? Math.min(base.price, altComparablePrice)
+        : Math.min(base.price, alt.price),
+      sizeComparable: comparable,
+      crossFamily,
+      searchTerm,
+    }
   }
 }
 
@@ -495,55 +570,57 @@ export default function ResultsPage() {
           if (selectedProduct && selectedProduct.name && selectedProduct.price) {
             console.log(`Using selected product: ${selectedProduct.name} from ${selectedProduct.store}`)
             
+            const baseSize = parseSize(selectedProduct.name)
             currentStoreProduct = {
               name: selectedProduct.name,
               price: parseFloat(selectedProduct.price),
               store: storedSupermarket,
-              category: selectedProduct.category
+              category: selectedProduct.category,
+              size: baseSize
             }
 
-            // Find similar products in OTHER stores (excluding the selected supermarket)
+            // Find similar products in OTHER stores (excluding the selected
+            // supermarket). Rank by name similarity AND size affinity so we
+            // don't pick, say, a 4-pint milk to compare against a 1-pint.
             const otherStoreProducts = matcher.allProducts
               .filter(product => product.store !== storedSupermarket)
               .map(product => {
                 const similarity = matcher.calculateSimilarity(productName, product.originalName)
-                return { ...product, similarity }
+                const rankScore = similarity * matcher.sizeAffinity(baseSize, product.size)
+                return { ...product, similarity, rankScore }
               })
               .filter(product => product.similarity >= 0.3 && product.price !== null)
-              .sort((a, b) => b.similarity - a.similarity)
+              .sort((a, b) => b.rankScore - a.rankScore)
 
             // Group by store and take best match from each store
             const byStore = {}
             otherStoreProducts.forEach(product => {
-              if (!byStore[product.store] || byStore[product.store].similarity < product.similarity) {
+              if (!byStore[product.store] || byStore[product.store].rankScore < product.rankScore) {
                 byStore[product.store] = product
               }
             })
 
-            // Create comparisons with the selected product
+            // Create size-aware comparisons with the selected product
             results = Object.values(byStore)
               .slice(0, 4) // Top 4 alternative stores
-              .map(altProduct => ({
-                product1: {
+              .map(altProduct => matcher.buildComparison(
+                {
                   name: currentStoreProduct.name,
                   price: currentStoreProduct.price,
                   store: currentStoreProduct.store,
-                  similarity: 1.0 // User selected this, so it's a perfect match
+                  similarity: 1.0, // User selected this, so it's a perfect match
+                  size: baseSize
                 },
-                product2: {
+                {
                   name: altProduct.originalName,
                   price: altProduct.price,
                   store: altProduct.store,
-                  similarity: altProduct.similarity
+                  similarity: altProduct.similarity,
+                  size: altProduct.size
                 },
-                priceDifference: Math.abs(currentStoreProduct.price - altProduct.price),
-                potentialSaving: Math.max(0, currentStoreProduct.price - altProduct.price),
-                combinedSimilarity: (1.0 + altProduct.similarity) / 2,
-                cheaperStore: currentStoreProduct.price < altProduct.price ? currentStoreProduct.store : altProduct.store,
-                cheaperPrice: Math.min(currentStoreProduct.price, altProduct.price),
-                searchTerm: productName
-              }))
-              .filter(comparison => comparison.potentialSaving >= 0) // Include all comparisons, even if no savings
+                productName
+              ))
+              .filter(comparison => !comparison.crossFamily) // drop non-like-for-like items
               .sort((a, b) => b.potentialSaving - a.potentialSaving)
 
           } else {
@@ -558,27 +635,25 @@ export default function ResultsPage() {
               
               // Find alternatives in other stores
               const alternatives = matcher.findBestAlternatives(productName, storedSupermarket)
-              
-              results = alternatives.map(alt => ({
-                product1: {
+
+              results = alternatives.map(alt => matcher.buildComparison(
+                {
                   name: currentStoreProduct.originalName,
                   price: currentStoreProduct.price,
                   store: storedSupermarket,
-                  similarity: currentStoreProduct.similarity
+                  similarity: currentStoreProduct.similarity,
+                  size: currentStoreProduct.size
                 },
-                product2: {
+                {
                   name: alt.originalName,
                   price: alt.price,
                   store: alt.store,
-                  similarity: alt.similarity
+                  similarity: alt.similarity,
+                  size: alt.size
                 },
-                priceDifference: Math.abs(currentStoreProduct.price - alt.price),
-                potentialSaving: Math.max(0, currentStoreProduct.price - alt.price),
-                combinedSimilarity: (currentStoreProduct.similarity + alt.similarity) / 2,
-                cheaperStore: currentStoreProduct.price < alt.price ? storedSupermarket : alt.store,
-                cheaperPrice: Math.min(currentStoreProduct.price, alt.price),
-                searchTerm: productName
-              }))
+                productName
+              ))
+              .filter(comparison => !comparison.crossFamily)
             }
           }
           
@@ -781,19 +856,38 @@ export default function ResultsPage() {
                               <span className="store-name">{comparison.product1.store}</span>
                               <span className="product-name">{comparison.product1.name}</span>
                               <span className="price">£{comparison.product1.price.toFixed(2)}</span>
+                              {comparison.product1.unitPrice && (
+                                <span className="unit-price">{comparison.product1.unitPrice}</span>
+                              )}
                             </div>
                             <div className="vs-divider">vs</div>
                             <div className="store-item">
                               <span className="store-name">{comparison.product2.store}</span>
                               <span className="product-name">{comparison.product2.name}</span>
                               <span className="price">£{comparison.product2.price.toFixed(2)}</span>
+                              {comparison.product2.unitPrice && (
+                                <span className="unit-price">{comparison.product2.unitPrice}</span>
+                              )}
                             </div>
                           </div>
-                          {comparison.potentialSaving > 0 && (
-                            <div className="saving-highlight">
-                              <span className="cheaper-store">{comparison.cheaperStore}</span> is cheaper by 
-                              <span className="saving-amount"> £{comparison.potentialSaving.toFixed(2)}</span>
-                            </div>
+                          {comparison.sizeComparable ? (
+                            comparison.potentialSaving > 0 ? (
+                              <div className="saving-highlight">
+                                <span className="cheaper-store">{comparison.cheaperStore}</span> is cheaper by
+                                <span className="saving-amount"> £{comparison.potentialSaving.toFixed(2)}</span>
+                                <span className="saving-note"> like-for-like</span>
+                              </div>
+                            ) : (
+                              <div className="saving-note">Same price like-for-like at both stores</div>
+                            )
+                          ) : (
+                            comparison.potentialSaving > 0 && (
+                              <div className="saving-highlight">
+                                <span className="cheaper-store">{comparison.cheaperStore}</span> is cheaper by
+                                <span className="saving-amount"> £{comparison.potentialSaving.toFixed(2)}</span>
+                                <span className="saving-note"> — check pack sizes</span>
+                              </div>
+                            )
                           )}
                         </div>
                       ))}

@@ -1196,6 +1196,31 @@ body {
   white-space: nowrap;
 }
 
+.suggestion-price-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  flex-shrink: 0;
+}
+
+.suggestion-unit-price {
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.suggestion-size {
+  font-weight: 600;
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  background: var(--color-secondary);
+  padding: 0.05rem var(--space-2);
+  border-radius: var(--radius-sm);
+  align-self: flex-start;
+  white-space: nowrap;
+}
+
 /* 
 ==============================================
 9C. CONTACT PAGE
@@ -2044,6 +2069,12 @@ body {
   width: fit-content;
 }
 
+.unit-price {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.15rem;
+}
+
 .vs-divider {
   font-size: 0.875rem;
   font-weight: 600;
@@ -2075,6 +2106,14 @@ body {
 .saving-amount {
   font-weight: 700;
   color: #16a34a;
+}
+
+.saving-note {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #6b7280;
 }
 
 .no-matches {
