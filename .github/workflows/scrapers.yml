@@ -98,12 +98,13 @@ jobs:
         env:
           CI: 'false'  # CRA treats warnings as errors under CI; don't fail the build on them
         run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name  "github-actions"
+          git config user.email "github-actions@github.com"
           npm ci
           npm run build                       # copies app/public/*.csv into build/
+          # gh-pages parses -u as an RFC 5322 address; brackets like "[bot]" are rejected.
           npx gh-pages -d build -b gh-pages \
-            -u "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+            -u "github-actions <github-actions@github.com>"
           echo "Deployed updated site to gh-pages."
 
       - name: Upload scraped CSVs as artifacts
