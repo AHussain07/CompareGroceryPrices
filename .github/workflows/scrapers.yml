@@ -97,14 +97,18 @@ jobs:
         working-directory: app
         env:
           CI: 'false'  # CRA treats warnings as errors under CI; don't fail the build on them
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name  "github-actions"
           git config user.email "github-actions@github.com"
           npm ci
           npm run build                       # copies app/public/*.csv into build/
           # gh-pages parses -u as an RFC 5322 address; brackets like "[bot]" are rejected.
+          # It also pushes from its own clone under node_modules/.cache/, which does not
+          # inherit the checkout action's credentials, so -r must carry the token.
           npx gh-pages -d build -b gh-pages \
-            -u "github-actions <github-actions@github.com>"
+            -u "github-actions <github-actions@github.com>" \
+            -r "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           echo "Deployed updated site to gh-pages."
 
       - name: Upload scraped CSVs as artifacts
